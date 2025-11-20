@@ -1,0 +1,14 @@
+%YAML 1.1
+---
+filename_prefix: strat_linoz_standalone_output
+averaging_type: instant
+fields:
+  physics:
+    field_names:
+      - T_mid
+      - O3
+
+output_control:
+  frequency: 1
+  frequency_units: nsteps
+...
