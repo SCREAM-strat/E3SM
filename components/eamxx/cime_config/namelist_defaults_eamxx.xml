@@ -331,6 +331,18 @@ be lost if SCREAM_HACK_XML is not enabled.
     </gw>
 
     <!-- Basic options for each mam4 atm process -->
+    <strat_linoz inherit="atm_proc_base">
+      <!-- LINOZ parameters -->
+      <mam4_o3_tau    type="real"    doc="Linoz tau parameter">172800.0</mam4_o3_tau>
+      <mam4_o3_sfc    type="real"    doc="Linoz surface parameter">3.0E-008</mam4_o3_sfc>
+      <mam4_o3_lbl    type="integer" doc="Linoz lbl parameter">4</mam4_o3_lbl>
+      <mam4_psc_T    type="real" doc="Linoz psc ozone loss temperature (K) threshold">193.0</mam4_psc_T>
+      <mam4_linoz_file_name type="file" doc="LINOZ chemistry file"> ${DIN_LOC_ROOT}/atm/scream/mam4xx/linoz/ne30pg2/linoz2010_2010JPL_CMIP6_10deg_58km_ne30pg2_c20250826.nc</mam4_linoz_file_name>
+      <mam4_linoz_file_name hgrid="ne4np4.pg2" type="file" doc="LINOZ chemistry file"> ${DIN_LOC_ROOT}/atm/scream/mam4xx/linoz/ne4pg2/linoz2010_2010JPL_CMIP6_10deg_58km_ne4pg2_c20250826.nc</mam4_linoz_file_name>
+      <mam4_chlorine_loading_ymd type="integer" doc="Cycle year for chlorine"> 20100101 </mam4_chlorine_loading_ymd>
+      <mam4_linoz_chlorine_file type="file" doc="File containing chlorine data"> ${DIN_LOC_ROOT}/atm/scream/mam4xx/linoz/Linoz_Chlorine_Loading_CMIP6_0003-2017_c20171114.nc</mam4_linoz_chlorine_file>
+    </strat_linoz>
+    <!-- Basic options for each mam4 atm process -->
     <mam4_atm_proc_base inherit="atm_proc_base">
       <create_fields_interval_checks type="logical" doc="Create field interval checks for all fields that are computed and requested in mam4xx." >false</create_fields_interval_checks>
       <use_mam4_precribed_ozone type="logical" doc="Switch to enable prescribed ozone in MAM4xx">false</use_mam4_precribed_ozone>
