@@ -1,0 +1,10 @@
+alias ATMCHANGE='$CIMEROOT/../components/eamxx/scripts/atmchange'
+
+./xmlchange SCREAM_CMAKE_OPTIONS="SCREAM_NP 4 SCREAM_NUM_VERTICAL_LEV 72 SCREAM_NUM_TRACERS 11"
+#------------------------------------------------------
+# Add microphysics process
+#------------------------------------------------------
+ATMCHANGE physics::atm_procs_list="mac_aero_mic,rrtmgp" -b
+
+# Set mac_aero_mic to default
+ATMCHANGE mac_aero_mic::atm_procs_list="tms,shoc,cld_fraction,spa,p3,strat_linoz" -b
