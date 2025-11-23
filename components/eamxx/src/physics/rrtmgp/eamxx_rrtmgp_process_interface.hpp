@@ -83,6 +83,10 @@ public:
   // Whether we do extra aerosol forcing calls
   bool m_extra_clnsky_diag;
   bool m_extra_clnclrsky_diag;
+  // Whether we use o3 from chemistry model
+  bool m_use_o3_prognotic;
+  // name of o3 in FM computed by chemistry model
+  std::string m_o3_tracer_name;
 
   // The orbital year, used for zenith angle calculations:
   // If > 0, use constant orbital year for duration of simulation
