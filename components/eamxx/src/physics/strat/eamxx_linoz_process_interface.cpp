@@ -181,7 +181,7 @@ void STRATLinoz::run_impl(const double dt) {
        Kokkos::TeamVectorRange(team, nlev),
        [&](const int kk) {
         const Real mmr_o3_dry =
-        PF::calculate_drymmr_from_wetmmr(qv(icol, kk), mmr_o3(icol,kk));
+        PF::calculate_drymmr_from_wetmmr(mmr_o3(icol,kk), qv(icol, kk));
         vmr(icol, kk) =  mam4::conversions::vmr_from_mmr(mmr_o3_dry,mw_o3);
        });
   });
@@ -282,6 +282,11 @@ void STRATLinoz::run_impl(const double dt) {
   const auto zenith_angle = acos_cosine_zenith_;
   // FIXME: we found a bug in the following bock of code in mam4xx. It needs to be updated.
   const auto& o3_col_deltas=m_o3_col_deltas;
+  //FIXME: we need to get o3_exo_coldens; it is hard-coded.
+  constexpr Real o3_exo_coldens = 1.7e17;
+  //o3_col_deltas at kk=0
+  const auto& o3_col_deltas_0=Kokkos::subview(o3_col_deltas,Kokkos::ALL, 0);
+  Kokkos::deep_copy(o3_col_deltas_0,o3_exo_coldens);
   Kokkos::parallel_for(
     "MAMMicrophysics::run_impl::compute_o3_column_density", policy,
     KOKKOS_LAMBDA(const ThreadTeam &team) {
@@ -291,15 +296,15 @@ void STRATLinoz::run_impl(const double dt) {
     auto o3_col_dens_i = ekat::subview(o3_col_dens, icol);
     auto o3_col_deltas_icol = ekat::subview(o3_col_deltas, icol);
     // NOTE: if we need o2 column densities, set_ub_col and setcol must be changed
-    const int nlev = mam4::nlev;
     Kokkos::parallel_for(Kokkos::TeamVectorRange(team, nlev), [&](const int kk) {
       // compute the change in o3 density for this column above its neighbor
-      constexpr Real xfactor = 2.8704e21 / (9.80616 * 1.38044); // BAD_CONSTANT!
-      o3_col_deltas_icol(kk + 1) = xfactor * p_del(icol, kk) * vmr(icol, kk);
+       mam4::mo_photo::set_ub_col(o3_col_deltas_icol(kk + 1) ,
+                vmr(icol, kk),
+                p_del(icol, kk));
     });
     team.team_barrier();
     // sum the o3 column deltas to densities
-    mam4::mo_photo::setcol(team, o3_col_deltas.data(), // in
+    mam4::mo_photo::setcol(team, o3_col_deltas_icol, // in
                          o3_col_dens_i);        // out
   });
 
@@ -324,7 +329,8 @@ void STRATLinoz::run_impl(const double dt) {
       Kokkos::parallel_for(
        Kokkos::TeamVectorRange(team, nlev),
        [&](const int kk) {
-      //-----------------
+       if (kk >= nlev - linoz_conf.o3_lbl) {
+        //-----------------
       // LINOZ chemistry
       //-----------------
       const Real temp = T_mid(icol, kk);
@@ -351,9 +357,7 @@ void STRATLinoz::run_impl(const double dt) {
           // outputs that are not used
           do3_linoz, do3_linoz_psc, ss_o3, o3col_du_diag, o3clim_linoz_diag,
           zenith_angle_degrees);
-
       // Update source terms above the ozone decay threshold
-      if (kk >= nlev - linoz_conf.o3_lbl) {
         const Real o3l_vmr_old = vmr(icol, kk);
         Real do3mass = 0;
         const Real o3l_vmr_new =
@@ -364,26 +368,16 @@ void STRATLinoz::run_impl(const double dt) {
                                                        do3mass);          // out
         // Update the mixing ratio (vmr) for O3
         vmr(icol, kk) = o3l_vmr_new;
-      }
-        });
-        });
 
-    // Conversion from mmr to vmr
-  Kokkos::parallel_for(
-    "STRATLinoz::run_impl::convert_to_mmr_wet", policy,
-    KOKKOS_LAMBDA(const ThreadTeam &team) {
-    const int icol     = team.league_rank();   // column index
-    Kokkos::parallel_for(
-       Kokkos::TeamVectorRange(team, nlev),
-       [&](const int kk) {
         const Real qv_dry =
         PF::calculate_drymmr_from_wetmmr(qv(icol, kk), qv(icol, kk));
         const Real mmr_dry = mam4::conversions::mmr_from_vmr(vmr(icol, kk),mw_o3);
         mmr_o3(icol,kk) = PF::calculate_wetmmr_from_drymmr(
           mmr_dry, qv_dry);
 
-       });
-  });
+      }
 
+        });
+        });
       }
 }  // namespace scream
