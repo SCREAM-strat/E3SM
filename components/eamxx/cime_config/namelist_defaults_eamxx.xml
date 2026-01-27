@@ -582,7 +582,7 @@ be lost if SCREAM_HACK_XML is not enabled.
       <!-- Note that h2o concentrations are just taken from qv, o3 is prescribed for now, -->
       <!-- o2 is hard-coded as a constant, CFCs are ignored                               -->
       <active_gases type="array(string)">h2o, co2, o3, n2o, co, ch4, o2, n2</active_gases>
-      <o3_prognostic_name COMPSET=".*SCREAM%MAM4xx.*" type="string">O3</o3_prognostic_name>
+      <o3_prognostic_name type="string">NONE</o3_prognostic_name>
       <ch4vmr      > 1807.851e-9  </ch4vmr>
       <co2vmr      > 388.717e-6   </co2vmr>
       <n2ovmr      > 323.141e-9   </n2ovmr>
