@@ -281,6 +281,8 @@ void HommeDynamics::fv_phys_rrtmgp_active_gases_remap (const RunType run_type) {
     const int ngll = NGP*NGP;
     const int npg = m_phys_grid_pgN*m_phys_grid_pgN;
     const int nelem = m_dyn_grid->get_num_local_dofs()/ngll;
+    const auto size_active_gases = trace_gases_workaround.get_active_gases().size();
+    if (size_active_gases > 0)
     { // CGLL -> DGLL
       const auto nlev = m_dyn_grid->get_num_vertical_levels();
       for (const auto& e : trace_gases_workaround.get_active_gases())
