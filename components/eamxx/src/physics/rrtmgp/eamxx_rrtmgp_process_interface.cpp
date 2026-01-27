@@ -70,8 +70,8 @@ RRTMGPRadiation (const ekat::Comm& comm, const ekat::ParameterList& params)
 {
   // Gather the active gases from the rrtmgp parameter list and assign to the m_gas_names vector.
   const auto& active_gases = m_params.get<std::vector<std::string>>("active_gases");
-  const auto& m_o3_tracer_name = m_params.get<std::string>("o3_prognostic_name","NONE");
-  bool m_use_o3_prognotic=false;
+  m_o3_tracer_name = m_params.get<std::string>("o3_prognostic_name","NONE");
+  m_use_o3_prognotic=false;
   if (m_o3_tracer_name != "NONE"){
      m_use_o3_prognotic=true;
   }
@@ -166,9 +166,14 @@ void RRTMGPRadiation::create_requests() {
   // Set of required gas concentration fields
   for (auto& it : m_gas_names) {
     // Add gas VOLUME mixing ratios (moles of gas / moles of air; what actually gets input to RRTMGP)
-    if ((it == "o3" ) and (!m_use_o3_prognotic)){
+    if (it == "o3" ){
       // o3 is read from file, or computed by chemistry
-      add_field<Required>(it + "_volume_mix_ratio", scalar3d_mid, mol/mol, grid_name);
+      if (m_use_o3_prognotic){
+        add_field<Computed>(it + "_volume_mix_ratio", scalar3d_mid, mol/mol, grid_name);
+      }else {
+        add_field<Required>(it + "_volume_mix_ratio", scalar3d_mid, mol/mol, grid_name);
+      }
+
     } else {
       // the rest are computed by RRTMGP from prescribed surface values
       // NOTE: this may change at some point
@@ -702,11 +707,14 @@ void RRTMGPRadiation::run_impl (const double dt) {
 
       // We read o3 in as a vmr already. Also, n2 and co are currently set
       // as a constant value, read from file during init. Skip these.
-      if (name == "n2" or name == "co") continue;
-      if ((name=="o3")  and (!m_use_o3_prognotic)) continue;
+      auto compute_o3_trace_vmr = (name == "o3") and (m_use_o3_prognotic);
+      if (name == "n2" or name == "co") 
+        continue;
+      if ((name=="o3")  and (!m_use_o3_prognotic))
+        continue;
 
       auto d_vmr = get_field_out(name + "_volume_mix_ratio").get_view<Real**>();
-      auto compute_o3_trace_vmr = (name == "o3") and (m_use_o3_prognotic);
+
       if (name == "h2o") {
         // h2o is (wet) mass mixing ratio in FM, otherwise known as "qv", which we've already read in above
         // Convert to vmr
@@ -962,7 +970,18 @@ void RRTMGPRadiation::run_impl (const double dt) {
         auto full_name = name + "_volume_mix_ratio";
 
         // 'o3' is marked as 'Required' rather than 'Computed', so we need to get the proper field
-        auto f = name=="o3" ? get_field_in(full_name) : get_field_out(full_name);
+        // if m_use_o3_prognotic is true, then o3 is computed.
+        Field f;
+        if (name=="o3"){
+          if (m_use_o3_prognotic){
+            f=get_field_out(full_name);
+          } else {
+            f=get_field_in(full_name);
+          }
+        }else{
+          f=get_field_out(full_name);
+        }
+        // auto f = (name=="o3" and !m_use_o3_prognotic) ? get_field_in(full_name) : get_field_out(full_name);
         auto d_vmr = f.get_view<const Real**>();
         auto tmp2d_k = conv.subview2d_impl(d_vmr, m_nlay);
 
@@ -1244,8 +1263,8 @@ void RRTMGPRadiation::run_impl (const double dt) {
 
       heat_flux(icol) = (fsnt - fsns) - (flnt - flns);
     });
-  }
 
+  }
 }
 // =========================================================================================
 
