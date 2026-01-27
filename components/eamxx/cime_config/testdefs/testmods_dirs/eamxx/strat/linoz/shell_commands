@@ -14,3 +14,8 @@ ATMCHANGE p3::do_predict_nc=true -b
 
 #Switch to turn on heterogeneous freezing due to prognostic aerosols
 ATMCHANGE p3::use_hetfrz_classnuc=false -b
+
+ATMCHANGE physics::rrtmgp::o3_prognostic_name=O3 -b
+
+# The initialization file screami_strat_linoz_ne4np4L72_20220823.nc is identical to screami_ne4np4L72_20220823.nc, but I added O3 variables from the mam4xx initialization file.
+ATMCHANGE initial_conditions::filename=/pscratch/sd/o/odiazib/SCREAM-strat/ncfiles/screami_strat_linoz_ne4np4L72_20220823.nc -b
