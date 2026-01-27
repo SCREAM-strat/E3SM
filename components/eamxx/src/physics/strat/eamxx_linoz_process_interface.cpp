@@ -120,38 +120,38 @@ void STRATLinoz::initialize_impl(const RunType run_type) {
   set_linoz_reader();
 
   acos_cosine_zenith_host_ = view_1d_host("host_acos(cosine_zenith)", ncol_);
+  acos_cosine_zenith_ = view_1d("device_acos(cosine_zenith)", ncol_);
+
   init_temporary_views();
 }
 
 int STRATLinoz::get_len_temporary_views() {
   int work_len              = 0;
   // m_vmr, m_o3_col_dens
-  work_len += 2*ncol_ * nlev_+ ncol_ * (nlev_+1) + ncol_;
+  work_len += 2*ncol_ * nlev_+ ncol_ * (nlev_+1);
   return work_len;
 }
 
 void STRATLinoz::init_temporary_views() {
   //FIXME: use buffer instead of temporary_views
-  view_1d temporary_views("temporary_views",get_len_temporary_views());
-  auto work_ptr             = (Real *)temporary_views.data();
-  m_o3_col_dens = view_2d(work_ptr, ncol_, nlev_);
-  work_ptr += ncol_ * nlev_;
-  m_vmr = view_2d(work_ptr, ncol_, nlev_);
-  work_ptr += ncol_ * nlev_;
-  m_o3_col_deltas = view_2d(work_ptr, ncol_, nlev_+1);
-  work_ptr += ncol_ * (nlev_+1);
-  acos_cosine_zenith_=view_1d(work_ptr, ncol_);
-  work_ptr += ncol_;
+  // view_1d temporary_views("temporary_views",get_len_temporary_views());
+  // auto work_ptr             = (Real *)temporary_views.data();
+  m_o3_col_dens = view_2d("m_o3_col_dens", ncol_, nlev_);
+  // work_ptr += ncol_ * nlev_;
+  m_vmr = view_2d("m_vmr", ncol_, nlev_);
+  // work_ptr += ncol_ * nlev_;
+  m_o3_col_deltas = view_2d("m_o3_col_deltas", ncol_, nlev_+1);
+  // work_ptr += ncol_ * (nlev_+1);
   // Error check
   // NOTE: workspace_provided can be larger than workspace_used, but let's try
   // to use the minimum amount of memory
-  const int workspace_used     = work_ptr - temporary_views.data();
-  const int workspace_provided = temporary_views.extent(0);
-  EKAT_REQUIRE_MSG(workspace_used == workspace_provided,
-                   "Error: workspace_used (" + std::to_string(workspace_used) +
-                       ") and workspace_provided (" +
-                       std::to_string(workspace_provided) +
-                       ") should be equal. \n");
+  // const int workspace_used     = work_ptr - temporary_views.data();
+  // const int workspace_provided = temporary_views.extent(0);
+  // EKAT_REQUIRE_MSG(workspace_used == workspace_provided,
+  //                  "Error: workspace_used (" + std::to_string(workspace_used) +
+  //                      ") and workspace_provided (" +
+  //                      std::to_string(workspace_provided) +
+  //                      ") should be equal. \n");
 }
 
 void STRATLinoz::run_impl(const double dt) {
