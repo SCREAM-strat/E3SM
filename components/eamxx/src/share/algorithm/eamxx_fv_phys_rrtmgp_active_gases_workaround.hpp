@@ -13,7 +13,7 @@ private:
   TraceGasesWorkaround () = default;
 
   std::shared_ptr<AbstractRemapper> remapper;
-  std::vector<std::string> active_gases; // other than h2o
+  std::vector<std::string> active_gases={}; // other than h2o
 
 public:
   RunType run_type = RunType::Initial;
