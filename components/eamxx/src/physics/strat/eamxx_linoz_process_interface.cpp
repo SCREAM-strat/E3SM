@@ -5,6 +5,7 @@
 #include <physics/mam/mam_coupling.hpp>
 #include "physics/mam/readfiles/tracer_reader_utils.hpp"
 #include "physics/rrtmgp/shr_orb_mod_c2f.hpp"
+#include "physics/mam/readfiles/vertical_remapper_exo_coldens.hpp"
 
 namespace scream
 {
@@ -40,6 +41,7 @@ STRATLinoz::set_grids(const std::shared_ptr<const GridsManager> grids_manager)
   // Layout for 3D (2d horiz X 1d vertical) variable defined at mid-level and
   // interfaces
   const FieldLayout scalar3d_mid = grid_->get_3d_scalar_layout(true);
+  const FieldLayout scalar3d_int = grid_->get_3d_scalar_layout(false);
   // Creating a Linoz reader and setting Linoz parameters involves reading data
   // from a file and configuring the necessary parameters for the Linoz model.
   m_var_names_linoz = {
@@ -58,6 +60,8 @@ STRATLinoz::set_grids(const std::shared_ptr<const GridsManager> grids_manager)
   add_field<Required>("T_mid", scalar3d_mid, K, grid_name);
   // Total pressure [Pa] at midpoints
   add_field<Required>("p_mid", scalar3d_mid, Pa, grid_name);
+  // Total pressure [Pa] at interfaces
+  add_field<Required>("p_int", scalar3d_int, Pa, grid_name);
   // Layer thickness(pdel) [Pa] at midpoints
   add_field<Required>("pseudo_density", scalar3d_mid, Pa, grid_name);
   constexpr auto q_unit = kg / kg;  // units of mass mixing ratios of tracers
@@ -68,6 +72,46 @@ STRATLinoz::set_grids(const std::shared_ptr<const GridsManager> grids_manager)
 
 }
 
+// set DataInterpolation object for elevated emissions reader.
+void STRATLinoz::set_exo_coldens_reader()
+{
+  const auto pint = get_field_in("p_int");
+  // Oxid fields read initialization
+  const std::string exo_coldens_file_name = m_params.get<std::string>("mam4_exo_coldens_name");
+  const std::string exo_coldens_map_file =
+        m_params.get<std::string>("aero_microphys_remap_file", "");
+  // get fields from FM.
+  auto grid_exo_coldens = grid_->clone("exo_grid",true);
+  grid_exo_coldens->reset_num_vertical_lev(1);
+  auto layout = grid_exo_coldens->get_3d_scalar_layout(true);
+  // FIXME: units are wrong.
+  auto mbar = ekat::units::Units(100*ekat::units::Pa,"mbar");
+  std::vector<std::string> exo_coldens_names={"O3_column_density"};
+  for(const auto &field_name : exo_coldens_names) {
+      Field field_exo(FieldIdentifier(field_name,layout,mbar,grid_exo_coldens->name()));
+      field_exo.allocate_view();
+      exo_coldens_fields_.push_back(field_exo);
+  }
+
+  // Beg of any year, since we use yearly periodic timeline
+  util::TimeStamp ref_ts_oxid (1,1,1,0,0,0);
+  data_interp_exo_coldens_ = std::make_shared<DataInterpolation>(grid_exo_coldens,exo_coldens_fields_);
+  data_interp_exo_coldens_->setup_time_database ({exo_coldens_file_name},util::TimeLine::YearlyPeriodic, ref_ts_oxid);
+  data_interp_exo_coldens_->create_horiz_remappers (exo_coldens_map_file=="none" ? "" : exo_coldens_map_file);
+  data_interp_exo_coldens_->set_logger(m_atm_logger);
+  DataInterpolation::VertRemapData remap_exo_coldens;
+  remap_exo_coldens.vr_type = DataInterpolation::Custom;
+  // We are using a custom remapper that invokes the MAM4XX routine
+  // for vertical interpolation.
+  auto grid_after_hremap = data_interp_exo_coldens_->get_grid_after_hremap();
+  auto vertical_remapper= std::make_shared<VerticalRemapperExoColdensMAM4>(grid_after_hremap, grid_exo_coldens);
+  vertical_remapper->set_delta_pressure(exo_coldens_file_name, pint);
+  remap_exo_coldens.custom_remapper=vertical_remapper;
+
+  data_interp_exo_coldens_->create_vert_remapper (remap_exo_coldens);
+  data_interp_exo_coldens_->init_data_interval (start_of_step_ts());
+
+}
 // set DataInterpolation object for linoz reader.
 void STRATLinoz::set_linoz_reader(){
   auto pmid = get_field_in("p_mid");
@@ -123,6 +167,7 @@ void STRATLinoz::initialize_impl(const RunType run_type) {
   acos_cosine_zenith_ = view_1d("device_acos(cosine_zenith)", ncol_);
 
   init_temporary_views();
+  set_exo_coldens_reader();
 }
 
 int STRATLinoz::get_len_temporary_views() {
@@ -227,6 +272,10 @@ void STRATLinoz::run_impl(const double dt) {
   const auto& linoz_conf=m_config;
   const auto& o3_col_dens = m_o3_col_dens;
 
+  data_interp_exo_coldens_->run(end_of_step_ts());
+  // NOTE: we only have one field
+  // exo absorber columns [molecules/cm^2]
+  const auto spc_exo_col = exo_coldens_fields_[0].get_view<Real**>();
     // Compute orbital parameters; these are used both for computing
   // the solar zenith angle.
   // Note: We are following the RRTMGP EAMxx interface to compute the zenith
