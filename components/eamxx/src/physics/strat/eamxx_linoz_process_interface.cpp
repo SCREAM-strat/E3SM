@@ -185,7 +185,7 @@ void STRATLinoz::init_temporary_views() {
   // work_ptr += ncol_ * nlev_;
   m_vmr = view_2d("m_vmr", ncol_, nlev_);
   // work_ptr += ncol_ * nlev_;
-  m_o3_col_deltas = view_2d("m_o3_col_deltas", ncol_, nlev_+1);
+  // m_o3_col_deltas = view_2d("m_o3_col_deltas", ncol_, nlev_+1);
   // work_ptr += ncol_ * (nlev_+1);
   // Error check
   // NOTE: workspace_provided can be larger than workspace_used, but let's try
@@ -275,7 +275,7 @@ void STRATLinoz::run_impl(const double dt) {
   data_interp_exo_coldens_->run(end_of_step_ts());
   // NOTE: we only have one field
   // exo absorber columns [molecules/cm^2]
-  const auto spc_exo_col = exo_coldens_fields_[0].get_view<Real**>();
+  const auto o3_exo_col = exo_coldens_fields_[0].get_view<Real**>();
     // Compute orbital parameters; these are used both for computing
   // the solar zenith angle.
   // Note: We are following the RRTMGP EAMxx interface to compute the zenith
@@ -330,7 +330,7 @@ void STRATLinoz::run_impl(const double dt) {
   }
   const auto zenith_angle = acos_cosine_zenith_;
   // FIXME: we found a bug in the following bock of code in mam4xx. It needs to be updated.
-  const auto& o3_col_deltas=m_o3_col_deltas;
+  // const auto& o3_col_deltas=m_o3_col_deltas;
   constexpr Real xfactor = 2.8704e21 / (9.80616 * 1.38044); // BAD_CONSTANT!
   Kokkos::parallel_for(
     "MAMMicrophysics::run_impl::compute_o3_column_density", policy,
