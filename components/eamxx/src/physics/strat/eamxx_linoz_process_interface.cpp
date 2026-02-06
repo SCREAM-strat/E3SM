@@ -96,7 +96,7 @@ void STRATLinoz::set_exo_coldens_reader()
   // Beg of any year, since we use yearly periodic timeline
   util::TimeStamp ref_ts_oxid (1,1,1,0,0,0);
   data_interp_exo_coldens_ = std::make_shared<DataInterpolation>(grid_exo_coldens,exo_coldens_fields_);
-  data_interp_exo_coldens_->setup_time_database ({exo_coldens_file_name},util::TimeLine::YearlyPeriodic, ref_ts_oxid);
+  data_interp_exo_coldens_->setup_time_database ({exo_coldens_file_name},util::TimeLine::YearlyPeriodic, DataInterpolation::Linear, ref_ts_oxid);
   data_interp_exo_coldens_->create_horiz_remappers (exo_coldens_map_file=="none" ? "" : exo_coldens_map_file);
   data_interp_exo_coldens_->set_logger(m_atm_logger);
   DataInterpolation::VertRemapData remap_exo_coldens;
@@ -126,7 +126,7 @@ void STRATLinoz::set_linoz_reader(){
   }
 
   data_interp_linoz_ = std::make_shared<DataInterpolation>(grid_,linoz_fields);
-  data_interp_linoz_->setup_time_database ({m_linoz_file_name},util::TimeLine::YearlyPeriodic, ref_ts_linoz);
+  data_interp_linoz_->setup_time_database ({m_linoz_file_name},util::TimeLine::YearlyPeriodic, DataInterpolation::Linear, ref_ts_linoz);
   data_interp_linoz_->create_horiz_remappers (linoz_map_file=="none" ? "" : linoz_map_file);
   data_interp_linoz_->set_logger(m_atm_logger);
 
@@ -331,30 +331,28 @@ void STRATLinoz::run_impl(const double dt) {
   const auto zenith_angle = acos_cosine_zenith_;
   // FIXME: we found a bug in the following bock of code in mam4xx. It needs to be updated.
   const auto& o3_col_deltas=m_o3_col_deltas;
-  //FIXME: we need to get o3_exo_coldens; it is hard-coded.
-  constexpr Real o3_exo_coldens = 1.7e17;
-  //o3_col_deltas at kk=0
-  const auto& o3_col_deltas_0=Kokkos::subview(o3_col_deltas,Kokkos::ALL, 0);
-  Kokkos::deep_copy(o3_col_deltas_0,o3_exo_coldens);
+  constexpr Real xfactor = 2.8704e21 / (9.80616 * 1.38044); // BAD_CONSTANT!
   Kokkos::parallel_for(
     "MAMMicrophysics::run_impl::compute_o3_column_density", policy,
     KOKKOS_LAMBDA(const ThreadTeam &team) {
     const int icol     = team.league_rank();   // column index
     // calculate o3 column densities (first component of col_dens in Fortran
     // code)
-    auto o3_col_dens_i = ekat::subview(o3_col_dens, icol);
-    auto o3_col_deltas_icol = ekat::subview(o3_col_deltas, icol);
-    // NOTE: if we need o2 column densities, set_ub_col and setcol must be changed
-    Kokkos::parallel_for(Kokkos::TeamVectorRange(team, nlev), [&](const int kk) {
-      // compute the change in o3 density for this column above its neighbor
-       mam4::mo_photo::set_ub_col(o3_col_deltas_icol(kk + 1) ,
-                vmr(icol, kk),
-                p_del(icol, kk));
+    auto o3_col_dens_icol = ekat::subview(o3_col_dens, icol);
+    auto p_del_icol = ekat::subview(o3_col_dens, icol);
+    auto vmr_icol = ekat::subview(vmr, icol);
+    constexpr int nlev = mam4::nlev;
+    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, nlev), [&](int kk) {
+      Real suma = 0.0;
+      Kokkos::parallel_reduce(
+        Kokkos::ThreadVectorRange(team, kk),
+        [&](int i, Real &lsum) {
+          lsum += xfactor * p_del_icol(i) * vmr_icol(i);
+        },
+        suma);
+      o3_col_dens_icol(kk) =
+      o3_exo_col(icol,0) + suma + 0.5 * xfactor * p_del_icol(kk) * vmr_icol(kk);
     });
-    team.team_barrier();
-    // sum the o3 column deltas to densities
-    mam4::mo_photo::setcol(team, o3_col_deltas_icol, // in
-                         o3_col_dens_i);        // out
   });
 
   Kokkos::parallel_for(
