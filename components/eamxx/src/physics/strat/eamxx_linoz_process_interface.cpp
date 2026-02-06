@@ -77,7 +77,7 @@ void STRATLinoz::set_exo_coldens_reader()
 {
   const auto pint = get_field_in("p_int");
   // Oxid fields read initialization
-  const std::string exo_coldens_file_name = m_params.get<std::string>("mam4_exo_coldens_name");
+  const std::string exo_coldens_file_name = m_params.get<std::string>("mam4_exo_coldens_file_name");
   const std::string exo_coldens_map_file =
         m_params.get<std::string>("aero_microphys_remap_file", "");
   // get fields from FM.
@@ -341,7 +341,6 @@ void STRATLinoz::run_impl(const double dt) {
     auto o3_col_dens_icol = ekat::subview(o3_col_dens, icol);
     auto p_del_icol = ekat::subview(o3_col_dens, icol);
     auto vmr_icol = ekat::subview(vmr, icol);
-    constexpr int nlev = mam4::nlev;
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, nlev), [&](int kk) {
       Real suma = 0.0;
       Kokkos::parallel_reduce(
