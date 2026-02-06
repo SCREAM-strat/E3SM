@@ -24,6 +24,7 @@ eamxx:
       mam4_linoz_file_name : ${SCREAM_DATA_DIR}/mam4xx/linoz/ne2np4/linoz2010_2010JPL_CMIP6_10deg_58km_ne2np4_c20250923.nc
       mam4_linoz_chlorine_file : ${SCREAM_DATA_DIR}/mam4xx/linoz/Linoz_Chlorine_Loading_CMIP6_0003-2017_c20171114.nc
       mam4_chlorine_loading_ymd : 20100101
+      mam4_exo_coldens_file_name : ${SCREAM_DATA_DIR}/mam4xx/linoz/ne2np4/exo_coldens_ne2np4_c20251206.nc
     spa:
       spa_data_file: ${SCREAM_DATA_DIR}/init/spa_file_unified_and_complete_ne2np4L72_20231222.nc
     p3:
