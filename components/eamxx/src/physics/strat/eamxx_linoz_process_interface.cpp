@@ -339,7 +339,7 @@ void STRATLinoz::run_impl(const double dt) {
     // calculate o3 column densities (first component of col_dens in Fortran
     // code)
     auto o3_col_dens_icol = ekat::subview(o3_col_dens, icol);
-    auto p_del_icol = ekat::subview(o3_col_dens, icol);
+    auto p_del_icol = ekat::subview(p_del, icol);
     auto vmr_icol = ekat::subview(vmr, icol);
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, nlev), [&](int kk) {
       Real suma = 0.0;
