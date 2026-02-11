@@ -4,18 +4,9 @@ alias ATMCHANGE='$CIMEROOT/../components/eamxx/scripts/atmchange'
 #------------------------------------------------------
 # Add microphysics process
 #------------------------------------------------------
-ATMCHANGE physics::atm_procs_list="mac_aero_mic,rrtmgp,strat_linoz" -b
-
-#Set precribed ccn to the default value
-ATMCHANGE p3::do_prescribed_ccn=true -b
-
-#Set predicted ccn to the default value (it is TRUE by default)
-ATMCHANGE p3::do_predict_nc=true -b
-
-#Switch to turn on heterogeneous freezing due to prognostic aerosols
-ATMCHANGE p3::use_hetfrz_classnuc=false -b
+ATMCHANGE physics::mac_aero_mic::atm_procs_list="tms,shoc,cld_fraction,spa,p3,strat_linoz" -b
 
 ATMCHANGE physics::rrtmgp::o3_prognostic_name=O3 -b
 
 # The initialization file screami_strat_linoz_ne4np4L72_20220823.nc is identical to screami_ne4np4L72_20220823.nc, but I added O3 variables from the mam4xx initialization file.
-ATMCHANGE initial_conditions::filename=/pscratch/sd/o/odiazib/SCREAM-strat/ncfiles/screami_strat_linoz_ne4np4L72_20220823.nc -b
+ATMCHANGE initial_conditions::filename=/gpfs/odiazib/ncfiles/screami_strat_linoz_ne4np4L72_20220823.nc -b
