@@ -330,8 +330,7 @@ void STRATLinoz::run_impl(const double dt) {
   }
   const auto zenith_angle = acos_cosine_zenith_;
   // FIXME: we found a bug in the following bock of code in mam4xx. It needs to be updated.
-  // const auto& o3_col_deltas=m_o3_col_deltas;
-  constexpr Real xfactor = 2.8704e21 / (9.80616 * 1.38044); // BAD_CONSTANT!
+
   Kokkos::parallel_for(
     "MAMMicrophysics::run_impl::compute_o3_column_density", policy,
     KOKKOS_LAMBDA(const ThreadTeam &team) {
@@ -341,17 +340,9 @@ void STRATLinoz::run_impl(const double dt) {
     auto o3_col_dens_icol = ekat::subview(o3_col_dens, icol);
     auto p_del_icol = ekat::subview(p_del, icol);
     auto vmr_icol = ekat::subview(vmr, icol);
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, nlev), [&](int kk) {
-      Real suma = 0.0;
-      Kokkos::parallel_reduce(
-        Kokkos::ThreadVectorRange(team, kk),
-        [&](int i, Real &lsum) {
-          lsum += xfactor * p_del_icol(i) * vmr_icol(i);
-        },
-        suma);
-      o3_col_dens_icol(kk) =
-      o3_exo_col(icol,0) + suma + 0.5 * xfactor * p_del_icol(kk) * vmr_icol(kk);
-    });
+    mam4::microphysics::compute_o3_column_density(team, p_del_icol,
+                               vmr_icol, o3_exo_col(icol,0),
+                               o3_col_dens_icol);
   });
 
   Kokkos::parallel_for(
