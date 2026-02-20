@@ -30,10 +30,10 @@ STRATLinoz::STRATLinoz(const ekat::Comm &comm, const ekat::ParameterList &params
 
 }
 void
-STRATLinoz::set_grids(const std::shared_ptr<const GridsManager> grids_manager)
+STRATLinoz::create_requests()
 {
   using namespace ekat::units;
-  grid_                 = grids_manager->get_grid("physics");
+  grid_                 = m_grids_manager->get_grid("physics");
   const auto &grid_name = grid_->name();
 
   ncol_ = grid_->get_num_local_dofs();      // number of columns on this rank
@@ -366,10 +366,9 @@ void STRATLinoz::run_impl(const double dt) {
       Kokkos::parallel_for(
        Kokkos::TeamVectorRange(team, nlev),
        [&](const int kk) {
-       if (kk >= nlev - linoz_conf.o3_lbl) {
-        //-----------------
-      // LINOZ chemistry
       //-----------------
+      // LINOZ chemistry
+      //-----------------s
       const Real temp = T_mid(icol, kk);
       const Real pmid = p_mid(icol, kk);
       const Real pdel = p_del(icol, kk);
@@ -394,6 +393,8 @@ void STRATLinoz::run_impl(const double dt) {
           // outputs that are not used
           do3_linoz, do3_linoz_psc, ss_o3, o3col_du_diag, o3clim_linoz_diag,
           zenith_angle_degrees);
+       if (kk >= nlev - linoz_conf.o3_lbl) {
+
       // Update source terms above the ozone decay threshold
         const Real o3l_vmr_old = vmr(icol, kk);
         Real do3mass = 0;
@@ -405,14 +406,14 @@ void STRATLinoz::run_impl(const double dt) {
                                                        do3mass);          // out
         // Update the mixing ratio (vmr) for O3
         vmr(icol, kk) = o3l_vmr_new;
-
+      }
+      if (vmr(icol,kk) < 0.0) vmr(icol,kk)=0.0;
+      
         const Real qv_dry =
         PF::calculate_drymmr_from_wetmmr(qv(icol, kk), qv(icol, kk));
         const Real mmr_dry = mam4::conversions::mmr_from_vmr(vmr(icol, kk),mw_o3);
         mmr_o3(icol,kk) = PF::calculate_wetmmr_from_drymmr(
           mmr_dry, qv_dry);
-
-      }
 
         });
         });
