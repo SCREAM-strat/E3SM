@@ -7,6 +7,8 @@ alias ATMCHANGE='$CIMEROOT/../components/eamxx/scripts/atmchange'
 ATMCHANGE physics::mac_aero_mic::atm_procs_list="tms,shoc,cld_fraction,spa,p3,strat_linoz" -b
 
 ATMCHANGE physics::rrtmgp::o3_prognostic_name=O3 -b
+ATMCHANGE physics::rrtmgp::use_o3_prognostic=true -b
 
 # The initialization file screami_strat_linoz_ne4np4L72_20220823.nc is identical to screami_ne4np4L72_20220823.nc, but I added O3 variables from the mam4xx initialization file.
+#ATMCHANGE initial_conditions::filename=/pscratch/sd/o/odiazib/SCREAM-strat/ncfiles/screami_strat_linoz_ne4np4L72_20220823.nc -b
 ATMCHANGE initial_conditions::filename=/gpfs/odiazib/ncfiles/screami_strat_linoz_ne4np4L72_20220823.nc -b
