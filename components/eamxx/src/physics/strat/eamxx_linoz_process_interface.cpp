@@ -69,6 +69,7 @@ STRATLinoz::create_requests()
   add_tracer<Required>("qv", grid_, q_unit);
   // If not using prescribed O3 (i.e., prognostic O3), we add it as a tracer
   add_tracer<Updated>("O3", grid_, q_unit);
+  add_field<Required>("pseudo_density_dry", scalar3d_mid, Pa, grid_name);
 
 }
 
@@ -197,6 +198,10 @@ void STRATLinoz::init_temporary_views() {
   //                      ") and workspace_provided (" +
   //                      std::to_string(workspace_provided) +
   //                      ") should be equal. \n");
+  dz_ = view_2d("dz_", ncol_, nlev_);
+  z_iface_ = view_2d("z_iface_", ncol_, nlev_ + 1);
+  z_mid_ = view_2d("z_mid_", ncol_, nlev_);
+  qv_dry_= view_2d("qv_dry_", ncol_, nlev_);
 }
 
 void STRATLinoz::run_impl(const double dt) {
@@ -206,6 +211,14 @@ void STRATLinoz::run_impl(const double dt) {
   const auto& T_mid  = get_field_in("T_mid").get_view<const Real **>();
   const auto& p_mid  = get_field_in("p_mid").get_view<const Real **>();
   const auto& p_del  = get_field_in("pseudo_density").get_view<const Real **>();
+  const auto& pint = get_field_in("p_int").get_view<const Real **>();
+  const auto& p_del_dry = get_field_in("pseudo_density_dry").get_view<const Real **>();
+
+  // outputs
+  const auto& dz      = dz_;
+  const auto& z_iface = z_iface_;
+  const auto& z_mid   = z_mid_;
+  const auto& qv_dry = qv_dry_;
 
   const int ncol = ncol_;
   const int nlev = nlev_;
@@ -228,6 +241,8 @@ void STRATLinoz::run_impl(const double dt) {
         const Real mmr_o3_dry =
         PF::calculate_drymmr_from_wetmmr(mmr_o3(icol,kk), qv(icol, kk));
         vmr(icol, kk) =  mam4::conversions::vmr_from_mmr(mmr_o3_dry,mw_o3);
+        qv_dry(icol, kk) =
+        PF::calculate_drymmr_from_wetmmr(qv(icol, kk), qv(icol, kk));
        });
   });
 
@@ -329,8 +344,6 @@ void STRATLinoz::run_impl(const double dt) {
     Kokkos::deep_copy(acos_cosine_zenith_, acos_cosine_zenith_host_);
   }
   const auto zenith_angle = acos_cosine_zenith_;
-  // FIXME: we found a bug in the following bock of code in mam4xx. It needs to be updated.
-
   Kokkos::parallel_for(
     "MAMMicrophysics::run_impl::compute_o3_column_density", policy,
     KOKKOS_LAMBDA(const ThreadTeam &team) {
@@ -343,13 +356,46 @@ void STRATLinoz::run_impl(const double dt) {
     mam4::microphysics::compute_o3_column_density(team, p_del_icol,
                                vmr_icol, o3_exo_col(icol,0),
                                o3_col_dens_icol);
+                            
   });
+
+
+  const Real z_surf = 0.0;
+
+  Kokkos::parallel_for(
+  "compute_zm_zi::dz", policy,
+  KOKKOS_LAMBDA(const ThreadTeam &team) {
+    const int icol = team.league_rank();
+    PF::calculate_dz(team, ekat::subview(p_del_dry, icol),
+                     ekat::subview(p_mid, icol), ekat::subview(T_mid, icol),
+                     ekat::subview(qv_dry, icol), ekat::subview(dz, icol));
+  });
+
+Kokkos::parallel_for(
+  "compute_zm_zi::z_int", policy,
+  KOKKOS_LAMBDA(const ThreadTeam &team) {
+    const int icol = team.league_rank();
+    PF::calculate_z_int(team, mam4::nlev, ekat::subview(dz, icol),
+                        z_surf, ekat::subview(z_iface, icol));
+  });
+
+Kokkos::parallel_for(
+  "compute_zm_zi::z_mid", policy,
+  KOKKOS_LAMBDA(const ThreadTeam &team) {
+    const int icol = team.league_rank();
+    PF::calculate_z_mid(team, mam4::nlev, ekat::subview(z_iface, icol),
+                        ekat::subview(z_mid, icol));
+  });
+
 
   Kokkos::parallel_for(
     "STRATLinoz::run_impl::linoz", policy,
     KOKKOS_LAMBDA(const ThreadTeam &team) {
       const int icol     = team.league_rank();   // column index
       const auto o3_col_dens_i = ekat::subview(o3_col_dens, icol);
+      const auto T_mid_icol = ekat::subview(T_mid, icol);
+      const auto p_mid_icol = ekat::subview(p_mid, icol);
+      const auto pint_icol = ekat::subview(pint, icol);
       // convert column latitude to radians
       const Real rlats = col_latitudes(icol) * M_PI / 180.0;
 
@@ -362,60 +408,77 @@ void STRATLinoz::run_impl(const double dt) {
       linoz_data.linoz_dPmL_dT_icol  = ekat::subview(linoz_dPmL_dT, icol);
       linoz_data.linoz_dPmL_dO3col_icol = ekat::subview(linoz_dPmL_dO3col, icol);
       linoz_data.linoz_cariolle_pscs_icol = ekat::subview(linoz_cariolle_pscs, icol);
+      
+      // FIXME: dry mass pressure interval [Pa]
+      const auto& z_i_face_icol   = ekat::subview(z_iface, icol);
+      const auto& z_mid_icol = ekat::subview(z_mid, icol);
 
+      //Find tropopause (or quit simulation if not found) as extinction should be
+      // applied only above tropopause */
+      const int ilev_tropp = mam4::aer_rad_props::tropopause_or_quit(p_mid_icol, pint_icol, T_mid_icol, z_mid_icol, z_i_face_icol);
+      // Part 1: LINOZ chemistry
+      team.team_barrier();
       Kokkos::parallel_for(
-       Kokkos::TeamVectorRange(team, nlev),
-       [&](const int kk) {
-      //-----------------
-      // LINOZ chemistry
-      //-----------------s
-      const Real temp = T_mid(icol, kk);
-      const Real pmid = p_mid(icol, kk);
-      const Real pdel = p_del(icol, kk);
+       Kokkos::TeamVectorRange(team, ilev_tropp),
+        [&](const int kk) {
+        const Real temp = T_mid_icol(kk);
+        const Real pmid = p_mid_icol(kk);
 
-      // the following things are diagnostics, which we're not
-      // including in the first rev
-      Real do3_linoz = 0, do3_linoz_psc = 0, ss_o3 = 0, o3col_du_diag = 0,
-           o3clim_linoz_diag = 0, zenith_angle_degrees = 0;
-      // index of "O3" in solsym array (in EAM)
-      mam4::lin_strat_chem::lin_strat_chem_solve_kk(
-          // in
-          o3_col_dens_i(kk), temp, zenith_angle(icol), pmid, dt, rlats,
-          linoz_data.linoz_o3_clim_icol(kk), linoz_data.linoz_t_clim_icol(kk),
-          linoz_data.linoz_o3col_clim_icol(kk),
-          linoz_data.linoz_PmL_clim_icol(kk),
-          linoz_data.linoz_dPmL_dO3_icol(kk), linoz_data.linoz_dPmL_dT_icol(kk),
-          linoz_data.linoz_dPmL_dO3col_icol(kk),
-          linoz_data.linoz_cariolle_pscs_icol(kk), linoz_conf.chlorine_loading,
-          linoz_conf.psc_T,
-          // in/out
-          vmr(icol, kk),
-          // outputs that are not used
-          do3_linoz, do3_linoz_psc, ss_o3, o3col_du_diag, o3clim_linoz_diag,
-          zenith_angle_degrees);
-       if (kk >= nlev - linoz_conf.o3_lbl) {
+        Real do3_linoz = 0, do3_linoz_psc = 0, ss_o3 = 0,
+             o3col_du_diag = 0, o3clim_linoz_diag = 0,
+             zenith_angle_degrees = 0;
 
-      // Update source terms above the ozone decay threshold
+        mam4::lin_strat_chem::lin_strat_chem_solve_kk(
+            // in
+            o3_col_dens_i(kk), temp, zenith_angle(icol), pmid, dt, rlats,
+            linoz_data.linoz_o3_clim_icol(kk),
+            linoz_data.linoz_t_clim_icol(kk),
+            linoz_data.linoz_o3col_clim_icol(kk),
+            linoz_data.linoz_PmL_clim_icol(kk),
+            linoz_data.linoz_dPmL_dO3_icol(kk),
+            linoz_data.linoz_dPmL_dT_icol(kk),
+            linoz_data.linoz_dPmL_dO3col_icol(kk),
+            linoz_data.linoz_cariolle_pscs_icol(kk),
+            linoz_conf.chlorine_loading,
+            linoz_conf.psc_T,
+            // in/out
+            vmr(icol, kk),
+            // outputs that are not used
+            do3_linoz, do3_linoz_psc, ss_o3, o3col_du_diag,
+            o3clim_linoz_diag, zenith_angle_degrees);
+    });
+Kokkos::parallel_for(
+    Kokkos::TeamVectorRange(team, nlev - linoz_conf.o3_lbl, nlev),
+    [&](const int kk) {
+        const Real pdel        = p_del(icol, kk);
         const Real o3l_vmr_old = vmr(icol, kk);
         Real do3mass = 0;
         const Real o3l_vmr_new =
-            mam4::lin_strat_chem::lin_strat_sfcsink_kk(dt, pdel,          // in
-                                                       o3l_vmr_old,       // in
-                                                       linoz_conf.o3_sfc, // in
-                                                       linoz_conf.o3_tau, // in
-                                                       do3mass);          // out
-        // Update the mixing ratio (vmr) for O3
+            mam4::lin_strat_chem::lin_strat_sfcsink_kk(
+                dt, pdel,           // in
+                o3l_vmr_old,        // in
+                linoz_conf.o3_sfc,  // in
+                linoz_conf.o3_tau,  // in
+                do3mass);           // out
         vmr(icol, kk) = o3l_vmr_new;
-      }
-      if (vmr(icol,kk) < 0.0) vmr(icol,kk)=0.0;
-      
-        const Real qv_dry =
-        PF::calculate_drymmr_from_wetmmr(qv(icol, kk), qv(icol, kk));
-        const Real mmr_dry = mam4::conversions::mmr_from_vmr(vmr(icol, kk),mw_o3);
-        mmr_o3(icol,kk) = PF::calculate_wetmmr_from_drymmr(
-          mmr_dry, qv_dry);
+    });
 
-        });
-        });
-      }
+  });
+
+ Kokkos::parallel_for(
+    "STRATLinoz::run_impl::check_zero_and_update_mmr", policy,
+    KOKKOS_LAMBDA(const ThreadTeam &team) { 
+      const int icol     = team.league_rank();   // column index
+   // Part 3: clamp vmr and convert to wet mass mixing ratio
+   Kokkos::parallel_for(
+    Kokkos::TeamVectorRange(team, nlev),
+    [&](const int kk) {
+        if (vmr(icol, kk) < 0.0) vmr(icol, kk) = 0.0;
+        const Real mmr_dry =
+            mam4::conversions::mmr_from_vmr(vmr(icol, kk), mw_o3);
+        mmr_o3(icol, kk) =
+            PF::calculate_wetmmr_from_drymmr(mmr_dry, qv_dry(icol, kk));
+    });
+   });  
+  }
 }  // namespace scream
