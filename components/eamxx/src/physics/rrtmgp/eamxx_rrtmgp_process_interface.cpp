@@ -70,10 +70,10 @@ RRTMGPRadiation (const ekat::Comm& comm, const ekat::ParameterList& params)
 {
   // Gather the active gases from the rrtmgp parameter list and assign to the m_gas_names vector.
   const auto& active_gases = m_params.get<std::vector<std::string>>("active_gases");
-  m_o3_tracer_name = m_params.get<std::string>("o3_prognostic_name","NONE");
-  m_use_o3_prognotic=false;
-  if (m_o3_tracer_name != "NONE"){
-     m_use_o3_prognotic=true;
+  m_o3_tracer_name = m_params.get<std::string>("o3_prognostic_name","O3");
+  m_use_o3_prognotic = m_params.get<bool>("use_o3_prognostic",false);
+  if (m_use_o3_prognotic && m_o3_tracer_name == "NONE") {
+    EKAT_ERROR_MSG("Error! m_use_o3_prognostic is true but m_o3_tracer_name is 'NONE'.\n");
   }
 
   for (auto& it : active_gases) {
@@ -704,7 +704,6 @@ void RRTMGPRadiation::run_impl (const double dt) {
     const auto gas_mol_weights = m_gas_mol_weights;
     for (int igas = 0; igas < m_ngas; igas++) {
       auto name = m_gas_names[igas];
-
       // We read o3 in as a vmr already. Also, n2 and co are currently set
       // as a constant value, read from file during init. Skip these.
       auto compute_o3_trace_vmr = (name == "o3") and (m_use_o3_prognotic);
@@ -737,10 +736,10 @@ void RRTMGPRadiation::run_impl (const double dt) {
           Kokkos::parallel_for(Kokkos::TeamVectorRange(team, nlay), [&] (const int& k) {
             // FIXME calculate_drymmr_from_wetmmr in interface
             // convert from wet mmr to dry mmr
+            
             const Real mmr_o3_dry = PF::calculate_drymmr_from_wetmmr(O3_tracer(icol,k), d_qv(icol,k));
             // from dry vmr compute dry mmr
             d_vmr(icol,k) = PF::calculate_vmr_from_mmr(gas_mol_weights[igas],d_qv(icol,k),mmr_o3_dry);
-
           });
         });
         Kokkos::fence();
