@@ -225,10 +225,10 @@ void STRATLinoz::run_impl(const double dt) {
   const auto policy = TPF::get_default_team_policy(ncol, nlev);
   const_view_1d &col_latitudes     = col_latitudes_;
   auto& vmr =m_vmr;
-  // CHECK: I assume it is mmr wet
   const auto& mmr_o3  = get_field_out("O3").get_view<Real **>();
   const auto& qv = get_field_in("qv").get_view<const Real **>();
-  constexpr Real mw_o3=  47.998200; // g/mol
+  // Note: MAM4xx use kg/mol for molecular weight.
+  const Real mw_o3=  scream::physics::Constants<Real>::get_gas_mol_weight("o3")/1.0e3; // kg/mol
 
   // Conversion from wet mmr to  dry vmr
   Kokkos::parallel_for(
