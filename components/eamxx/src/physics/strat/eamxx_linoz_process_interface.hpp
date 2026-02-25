@@ -102,6 +102,10 @@ class STRATLinoz : public AtmosphereProcess {
   //
   view_2d m_vmr;
   view_2d m_o3_col_deltas;
+  view_2d dz_;
+  view_2d z_iface_;
+  view_2d z_mid_;
+  view_2d qv_dry_;
 
 };  // MAMMicrophysics
 
