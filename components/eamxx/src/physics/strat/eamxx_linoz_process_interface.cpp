@@ -345,7 +345,7 @@ void STRATLinoz::run_impl(const double dt) {
   }
   const auto zenith_angle = acos_cosine_zenith_;
   Kokkos::parallel_for(
-    "MAMMicrophysics::run_impl::compute_o3_column_density", policy,
+    "STRATLinoz::run_impl::compute_o3_column_density", policy,
     KOKKOS_LAMBDA(const ThreadTeam &team) {
     const int icol     = team.league_rank();   // column index
     // calculate o3 column densities (first component of col_dens in Fortran
@@ -363,7 +363,7 @@ void STRATLinoz::run_impl(const double dt) {
   const Real z_surf = 0.0;
 
   Kokkos::parallel_for(
-  "compute_zm_zi::dz", policy,
+  "STRATLinoz::run_impl::compute_zm_zi::dz", policy,
   KOKKOS_LAMBDA(const ThreadTeam &team) {
     const int icol = team.league_rank();
     PF::calculate_dz(team, ekat::subview(p_del_dry, icol),
@@ -372,7 +372,7 @@ void STRATLinoz::run_impl(const double dt) {
   });
 
 Kokkos::parallel_for(
-  "compute_zm_zi::z_int", policy,
+  "STRATLinoz::run_impl::compute_zm_zi::z_int", policy,
   KOKKOS_LAMBDA(const ThreadTeam &team) {
     const int icol = team.league_rank();
     PF::calculate_z_int(team, mam4::nlev, ekat::subview(dz, icol),
@@ -380,7 +380,7 @@ Kokkos::parallel_for(
   });
 
 Kokkos::parallel_for(
-  "compute_zm_zi::z_mid", policy,
+  "STRATLinoz::run_impl::compute_zm_zi::z_mid", policy,
   KOKKOS_LAMBDA(const ThreadTeam &team) {
     const int icol = team.league_rank();
     PF::calculate_z_mid(team, mam4::nlev, ekat::subview(z_iface, icol),
