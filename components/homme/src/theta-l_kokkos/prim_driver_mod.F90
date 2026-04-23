@@ -62,10 +62,6 @@ contains
     ! Init the c data structures
     call prim_create_c_data_structures(tl,hvcoord,elem(1)%mp)
 
-    ! Initialize reference states in C++ before functors so that
-    ! HyperviscosityFunctorImpl::init_params can read nu_scale_top from ref_states.
-    call prim_init_ref_states_views (elem)
-
     !Init the kokkos functors (and their boundary exchanges)
     call prim_init_kokkos_functors ()
 
@@ -366,6 +362,9 @@ contains
 
     ! Initialize the 3d states views in C++
     call prim_init_state_views (elem)
+    
+    ! Initialize the reference states in C++
+    call prim_init_ref_states_views (elem)
 
     ! Initialize the diagnostics arrays in C++
     call prim_init_diags_views (elem)
