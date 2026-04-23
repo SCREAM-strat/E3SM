@@ -38,6 +38,12 @@
 #include "physics/mam/eamxx_mam_srf_and_online_emissions_process_interface.hpp"
 #include "physics/mam/eamxx_mam_constituent_fluxes_interface.hpp"
 #endif
+
+#ifdef EAMXX_HAS_STRAT_CHEM
+#include "physics/strat/eamxx_linoz_process_interface.hpp"
+#endif
+
+
 #ifdef EAMXX_HAS_COSP
 #include "physics/cosp/eamxx_cosp.hpp"
 #endif
@@ -79,6 +85,7 @@ inline void register_physics () {
 #ifdef EAMXX_HAS_NUDGING
   proc_factory.register_product("Nudging",&create_atmosphere_process<Nudging>);
 #endif
+
 #ifdef EAMXX_HAS_MAM
   proc_factory.register_product("mam4_aero_microphys",&create_atmosphere_process<MAMMicrophysics>);
   proc_factory.register_product("mam4_optics",&create_atmosphere_process<MAMOptics>);
@@ -88,6 +95,11 @@ inline void register_physics () {
   proc_factory.register_product("mam4_srf_online_emiss",&create_atmosphere_process<MAMSrfOnlineEmiss>);
   proc_factory.register_product("mam4_constituent_fluxes",&create_atmosphere_process<MAMConstituentFluxes>);
 #endif
+
+#ifdef EAMXX_HAS_STRAT_CHEM
+  proc_factory.register_product("strat_linoz",&create_atmosphere_process<STRATLinoz>);
+#endif
+
 #ifdef EAMXX_HAS_COSP
   proc_factory.register_product("Cosp",&create_atmosphere_process<Cosp>);
 #endif

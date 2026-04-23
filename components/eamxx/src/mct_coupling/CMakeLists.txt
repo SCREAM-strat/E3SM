@@ -51,6 +51,7 @@ endif()
 
 if (SCREAM_ENABLE_MAM)
   list (APPEND SCREAM_LIBS mam)
+  list (APPEND SCREAM_LIBS strat_chem)
 endif()
 
 # Create atm lib

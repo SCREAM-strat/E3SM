@@ -70,11 +70,17 @@ RRTMGPRadiation (const ekat::Comm& comm, const ekat::ParameterList& params)
 {
   // Gather the active gases from the rrtmgp parameter list and assign to the m_gas_names vector.
   const auto& active_gases = m_params.get<std::vector<std::string>>("active_gases");
+  m_o3_tracer_name = m_params.get<std::string>("o3_prognostic_name","O3");
+  m_use_o3_prognotic = m_params.get<bool>("use_o3_prognostic",false);
+  if (m_use_o3_prognotic && m_o3_tracer_name == "NONE") {
+    EKAT_ERROR_MSG("Error! m_use_o3_prognostic is true but m_o3_tracer_name is 'NONE'.\n");
+  }
+
   for (auto& it : active_gases) {
     // Make sure only unique names are added
     if (not ekat::contains(m_gas_names,it)) {
       m_gas_names.push_back(it);
-      if (it=="o3") {
+      if ((it=="o3") and (!m_use_o3_prognotic) ) {
         TraceGasesWorkaround::singleton().add_active_gas(it + "_volume_mix_ratio");
       }
     }
@@ -153,12 +159,21 @@ void RRTMGPRadiation::create_requests() {
   add_field<Required>("eff_radius_qi", scalar3d_mid, micron, grid_name);
   add_field<Required>("qv",scalar3d_mid,kg/kg,grid_name);
   add_field<Required>("surf_lw_flux_up",scalar2d,W/(m*m),grid_name);
+
+  if (m_use_o3_prognotic)
+   add_field<Required>(m_o3_tracer_name,scalar3d_mid,mol/mol,grid_name);
+
   // Set of required gas concentration fields
   for (auto& it : m_gas_names) {
     // Add gas VOLUME mixing ratios (moles of gas / moles of air; what actually gets input to RRTMGP)
-    if (it == "o3") {
+    if (it == "o3" ){
       // o3 is read from file, or computed by chemistry
-      add_field<Required>(it + "_volume_mix_ratio", scalar3d_mid, mol/mol, grid_name);
+      if (m_use_o3_prognotic){
+        add_field<Computed>(it + "_volume_mix_ratio", scalar3d_mid, mol/mol, grid_name);
+      }else {
+        add_field<Required>(it + "_volume_mix_ratio", scalar3d_mid, mol/mol, grid_name);
+      }
+
     } else {
       // the rest are computed by RRTMGP from prescribed surface values
       // NOTE: this may change at some point
@@ -689,12 +704,16 @@ void RRTMGPRadiation::run_impl (const double dt) {
     const auto gas_mol_weights = m_gas_mol_weights;
     for (int igas = 0; igas < m_ngas; igas++) {
       auto name = m_gas_names[igas];
-
       // We read o3 in as a vmr already. Also, n2 and co are currently set
       // as a constant value, read from file during init. Skip these.
-      if (name=="o3" or name == "n2" or name == "co") continue;
+      auto compute_o3_trace_vmr = (name == "o3") and (m_use_o3_prognotic);
+      if (name == "n2" or name == "co") 
+        continue;
+      if ((name=="o3")  and (!m_use_o3_prognotic))
+        continue;
 
       auto d_vmr = get_field_out(name + "_volume_mix_ratio").get_view<Real**>();
+
       if (name == "h2o") {
         // h2o is (wet) mass mixing ratio in FM, otherwise known as "qv", which we've already read in above
         // Convert to vmr
@@ -706,7 +725,26 @@ void RRTMGPRadiation::run_impl (const double dt) {
           });
         });
         Kokkos::fence();
-      } else {
+      }
+      // O3 from chemistry model is computed as wet mmr
+      else if (compute_o3_trace_vmr)
+      {
+       auto O3_tracer = get_field_in(m_o3_tracer_name).get_view<const Real**>();
+       const auto policy = TPF::get_default_team_policy(m_ncol, m_nlay);
+        Kokkos::parallel_for(policy, KOKKOS_LAMBDA(const MemberType& team) {
+          const int icol = team.league_rank();
+          Kokkos::parallel_for(Kokkos::TeamVectorRange(team, nlay), [&] (const int& k) {
+            // FIXME calculate_drymmr_from_wetmmr in interface
+            // convert from wet mmr to dry mmr
+            
+            const Real mmr_o3_dry = PF::calculate_drymmr_from_wetmmr(O3_tracer(icol,k), d_qv(icol,k));
+            // from dry vmr compute dry mmr
+            d_vmr(icol,k) = PF::calculate_vmr_from_mmr(gas_mol_weights[igas],d_qv(icol,k),mmr_o3_dry);
+          });
+        });
+        Kokkos::fence();
+      }
+      else {
         // This gives (dry) mass mixing ratios
         scream::physics::trcmix(
           name, m_nlay, m_lat.get_view<const Real*>(), d_pmid, d_vmr,
@@ -931,7 +969,18 @@ void RRTMGPRadiation::run_impl (const double dt) {
         auto full_name = name + "_volume_mix_ratio";
 
         // 'o3' is marked as 'Required' rather than 'Computed', so we need to get the proper field
-        auto f = name=="o3" ? get_field_in(full_name) : get_field_out(full_name);
+        // if m_use_o3_prognotic is true, then o3 is computed.
+        Field f;
+        if (name=="o3"){
+          if (m_use_o3_prognotic){
+            f=get_field_out(full_name);
+          } else {
+            f=get_field_in(full_name);
+          }
+        }else{
+          f=get_field_out(full_name);
+        }
+        // auto f = (name=="o3" and !m_use_o3_prognotic) ? get_field_in(full_name) : get_field_out(full_name);
         auto d_vmr = f.get_view<const Real**>();
         auto tmp2d_k = conv.subview2d_impl(d_vmr, m_nlay);
 
@@ -1213,8 +1262,8 @@ void RRTMGPRadiation::run_impl (const double dt) {
 
       heat_flux(icol) = (fsnt - fsns) - (flnt - flns);
     });
-  }
 
+  }
 }
 // =========================================================================================
 
