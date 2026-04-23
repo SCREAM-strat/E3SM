@@ -62,6 +62,10 @@ contains
     ! Init the c data structures
     call prim_create_c_data_structures(tl,hvcoord,elem(1)%mp)
 
+    ! Initialize reference states in C++ before functors so that
+    ! HyperviscosityFunctorImpl::init_params can read nu_scale_top from ref_states.
+    call prim_init_ref_states_views (elem)
+
     !Init the kokkos functors (and their boundary exchanges)
     call prim_init_kokkos_functors ()
 
@@ -296,7 +300,7 @@ contains
   subroutine prim_init_ref_states_views (elem)
     use iso_c_binding, only : c_ptr, c_loc
     use element_mod,   only : element_t
-    use element_state, onlY : elem_theta_ref, elem_dp_ref, elem_phi_ref
+    use element_state, onlY : elem_theta_ref, elem_dp_ref, elem_phi_ref, nu_scale_top
     use theta_f2c_mod, only : init_reference_states_c
     !
     ! Input(s)
@@ -306,11 +310,14 @@ contains
     ! Local(s)
     !
     type (c_ptr) :: elem_theta_ref_ptr, elem_dp_ref_ptr, elem_phi_ref_ptr
+    type (c_ptr) :: nu_scale_top_ptr
 
     elem_theta_ref_ptr = c_loc(elem_theta_ref)
     elem_dp_ref_ptr    = c_loc(elem_dp_ref)
     elem_phi_ref_ptr   = c_loc(elem_phi_ref)
-    call init_reference_states_c (elem_theta_ref_ptr, elem_dp_ref_ptr, elem_phi_ref_ptr)
+    nu_scale_top_ptr   = c_loc(nu_scale_top)
+    call init_reference_states_c (elem_theta_ref_ptr, elem_dp_ref_ptr, &
+                                  elem_phi_ref_ptr, nu_scale_top_ptr)
   end subroutine prim_init_ref_states_views
 
   subroutine prim_init_diags_views (elem)
@@ -359,9 +366,6 @@ contains
 
     ! Initialize the 3d states views in C++
     call prim_init_state_views (elem)
-
-    ! Initialize the reference states in C++
-    call prim_init_ref_states_views (elem)
 
     ! Initialize the diagnostics arrays in C++
     call prim_init_diags_views (elem)
