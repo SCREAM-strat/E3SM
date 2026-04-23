@@ -35,13 +35,15 @@ STRATLinoz::create_requests()
   using namespace ekat::units;
   grid_                 = m_grids_manager->get_grid("physics");
   const auto &grid_name = grid_->name();
+  // define the different field layouts that will be used for this process
+  using namespace ShortFieldTagsNames;
 
   ncol_ = grid_->get_num_local_dofs();      // number of columns on this rank
   nlev_ = grid_->get_num_vertical_levels(); // number of levels per column
   // Layout for 3D (2d horiz X 1d vertical) variable defined at mid-level and
   // interfaces
-  const FieldLayout scalar3d_mid = grid_->get_3d_scalar_layout(true);
-  const FieldLayout scalar3d_int = grid_->get_3d_scalar_layout(false);
+  const FieldLayout scalar3d_mid = grid_->get_3d_scalar_layout(LEV);
+  const FieldLayout scalar3d_int = grid_->get_3d_scalar_layout(ILEV);
   // Creating a Linoz reader and setting Linoz parameters involves reading data
   // from a file and configuring the necessary parameters for the Linoz model.
   m_var_names_linoz = {
@@ -76,28 +78,31 @@ STRATLinoz::create_requests()
 // set DataInterpolation object for elevated emissions reader.
 void STRATLinoz::set_exo_coldens_reader()
 {
+  using namespace ekat::units;
+  using namespace ShortFieldTagsNames;
   const auto pint = get_field_in("p_int");
-  // Oxid fields read initialization
+  // Exo column density fields read initialization
   const std::string exo_coldens_file_name = m_params.get<std::string>("mam4_exo_coldens_file_name");
   const std::string exo_coldens_map_file =
         m_params.get<std::string>("aero_microphys_remap_file", "");
   // get fields from FM.
   auto grid_exo_coldens = grid_->clone("exo_grid",true);
-  grid_exo_coldens->reset_num_vertical_lev(1);
-  auto layout = grid_exo_coldens->get_3d_scalar_layout(true);
-  // FIXME: units are wrong.
-  auto mbar = ekat::units::Units(100*ekat::units::Pa,"mbar");
-  std::vector<std::string> exo_coldens_names={"O3_column_density"};
-  for(const auto &field_name : exo_coldens_names) {
-      Field field_exo(FieldIdentifier(field_name,layout,mbar,grid_exo_coldens->name()));
-      field_exo.allocate_view();
-      exo_coldens_fields_.push_back(field_exo);
-  }
+  grid_exo_coldens->reset_vertical_configuration(1, AbstractGrid::VKind::Model);
+  auto layout = grid_exo_coldens->get_3d_scalar_layout(LEV);
+
+  auto molec = Units::nondimensional();// example;
+  auto cm2 = pow(m / 100,2);
+  auto molec_cm2 = Units(molec/cm2,"molecules/cm2");
+  const std::string exo_coldens_name = "O3_column_density";
+  Field field_exo(
+      FieldIdentifier(exo_coldens_name, layout, molec_cm2, grid_exo_coldens->name()));
+  field_exo.allocate_view();
+  exo_coldens_fields_.push_back(field_exo);
 
   // Beg of any year, since we use yearly periodic timeline
-  util::TimeStamp ref_ts_oxid (1,1,1,0,0,0);
+  util::TimeStamp ref_ts_exo_coldens (1,1,1,0,0,0);
   data_interp_exo_coldens_ = std::make_shared<DataInterpolation>(grid_exo_coldens,exo_coldens_fields_);
-  data_interp_exo_coldens_->setup_time_database ({exo_coldens_file_name},util::TimeLine::YearlyPeriodic, DataInterpolation::Linear, ref_ts_oxid);
+  data_interp_exo_coldens_->setup_time_database ({exo_coldens_file_name},util::TimeLine::YearlyPeriodic,DataInterpolation::Linear, ref_ts_exo_coldens);
   data_interp_exo_coldens_->create_horiz_remappers (exo_coldens_map_file=="none" ? "" : exo_coldens_map_file);
   data_interp_exo_coldens_->set_logger(m_atm_logger);
   DataInterpolation::VertRemapData remap_exo_coldens;
@@ -353,9 +358,13 @@ void STRATLinoz::run_impl(const double dt) {
     auto o3_col_dens_icol = ekat::subview(o3_col_dens, icol);
     auto p_del_icol = ekat::subview(p_del, icol);
     auto vmr_icol = ekat::subview(vmr, icol);
+    Kokkos::View<Real**, Kokkos::MemoryUnmanaged> vmr_icol_2d(vmr_icol.data(), nlev, 1);
+    //FIXME: vmr_icol needs to be 2D view. 
+    // However, in this interface I only need O3. Thus, I only create a 1D view for vmr
+    //somehow make a 2D view with vmr_icol and pass o3_indx=0
     mam4::microphysics::compute_o3_column_density(team, p_del_icol,
-                               vmr_icol, o3_exo_col(icol,0),
-                               o3_col_dens_icol);
+                               vmr_icol_2d, o3_exo_col(icol,0),
+                               0, o3_col_dens_icol);
                             
   });
 
@@ -415,7 +424,7 @@ Kokkos::parallel_for(
 
       //Find tropopause (or quit simulation if not found) as extinction should be
       // applied only above tropopause */
-      const int ilev_tropp = mam4::aer_rad_props::tropopause_or_quit(p_mid_icol, pint_icol, T_mid_icol, z_mid_icol, z_i_face_icol);
+      const int ilev_tropp = mam4::aero_rad_props::tropopause_or_quit(p_mid_icol, pint_icol, T_mid_icol, z_mid_icol, z_i_face_icol);
       // Part 1: LINOZ chemistry
       team.team_barrier();
       Kokkos::parallel_for(
