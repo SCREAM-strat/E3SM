@@ -27,7 +27,7 @@ void VertDerivativeDiag::create_requests() {
                        m_derivative_method + "\n");
   m_diag_name = fn + "_" + m_derivative_method + "vert_derivative";
 
-  auto scalar3d = g->get_3d_scalar_layout(true);
+  auto scalar3d = g->get_3d_scalar_layout(LEV);
   add_field<Required>("pseudo_density", scalar3d, Pa, gn);
   if (m_derivative_method == "z") {
     add_field<Required>("dz", scalar3d, m, gn);
@@ -61,7 +61,7 @@ void VertDerivativeDiag::initialize_impl(const RunType /*run_type*/) {
     diag_units = fid.get_units() / m;
   }
 
-  FieldIdentifier d_fid(m_diag_name, layout, diag_units, fid.get_grid_name());
+  auto d_fid = fid.clone(m_diag_name).reset_units(diag_units);
   m_diagnostic_output = Field(d_fid);
   m_diagnostic_output.allocate_view();
 }
