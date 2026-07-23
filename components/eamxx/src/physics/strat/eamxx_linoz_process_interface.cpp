@@ -50,10 +50,9 @@ STRATLinoz::create_requests()
         "o3_clim",  "o3col_clim", "t_clim",      "PmL_clim",
         "dPmL_dO3", "dPmL_dT",    "dPmL_dO3col", "cariolle_pscs"};
 
-  constexpr auto nondim = Units::nondimensional();
   // The DataInterpolation class uses Field. We save these fields in FM.
   for(const auto &field_name : m_var_names_linoz) {
-      add_field<Computed>(field_name, scalar3d_mid, nondim, grid_name);
+      add_field<Computed>(field_name, scalar3d_mid, none, grid_name);
   }
   // get column geometry and locations
   col_latitudes_ = grid_->get_geometry_data("lat").get_view<const Real *>();
@@ -90,7 +89,7 @@ void STRATLinoz::set_exo_coldens_reader()
   grid_exo_coldens->reset_vertical_configuration(1, AbstractGrid::VKind::Model);
   auto layout = grid_exo_coldens->get_3d_scalar_layout(LEV);
 
-  auto molec = Units::nondimensional();// example;
+  auto molec = none;// example;
   auto cm2 = pow(m / 100,2);
   auto molec_cm2 = Units(molec/cm2,"molecules/cm2");
   const std::string exo_coldens_name = "O3_column_density";
@@ -102,7 +101,7 @@ void STRATLinoz::set_exo_coldens_reader()
   // Beg of any year, since we use yearly periodic timeline
   util::TimeStamp ref_ts_exo_coldens (1,1,1,0,0,0);
   data_interp_exo_coldens_ = std::make_shared<DataInterpolation>(grid_exo_coldens,exo_coldens_fields_);
-  data_interp_exo_coldens_->setup_time_database ({exo_coldens_file_name},util::TimeLine::YearlyPeriodic,DataInterpolation::Linear, ref_ts_exo_coldens);
+  data_interp_exo_coldens_->setup_periodic_time_database ({exo_coldens_file_name});
   data_interp_exo_coldens_->create_horiz_remappers (exo_coldens_map_file=="none" ? "" : exo_coldens_map_file);
   data_interp_exo_coldens_->set_logger(m_atm_logger);
   DataInterpolation::VertRemapData remap_exo_coldens;
@@ -115,7 +114,7 @@ void STRATLinoz::set_exo_coldens_reader()
   remap_exo_coldens.custom_remapper=vertical_remapper;
 
   data_interp_exo_coldens_->create_vert_remapper (remap_exo_coldens);
-  data_interp_exo_coldens_->init_data_interval (start_of_step_ts());
+  data_interp_exo_coldens_->init_time_interpolation (start_of_step_ts(), DataInterpolation::Linear);
 
 }
 // set DataInterpolation object for linoz reader.
@@ -132,7 +131,7 @@ void STRATLinoz::set_linoz_reader(){
   }
 
   data_interp_linoz_ = std::make_shared<DataInterpolation>(grid_,linoz_fields);
-  data_interp_linoz_->setup_time_database ({m_linoz_file_name},util::TimeLine::YearlyPeriodic, DataInterpolation::Linear, ref_ts_linoz);
+  data_interp_linoz_->setup_periodic_time_database ({m_linoz_file_name});
   data_interp_linoz_->create_horiz_remappers (linoz_map_file=="none" ? "" : linoz_map_file);
   data_interp_linoz_->set_logger(m_atm_logger);
 
@@ -153,7 +152,7 @@ void STRATLinoz::set_linoz_reader(){
     remap_data_linoz.custom_remapper=vertical_remapper_linoz;
   }
   data_interp_linoz_->create_vert_remapper (remap_data_linoz);
-  data_interp_linoz_->init_data_interval (start_of_step_ts());
+  data_interp_linoz_->init_time_interpolation (start_of_step_ts(), DataInterpolation::Linear);
 }
 
 void STRATLinoz::initialize_impl(const RunType run_type) {
