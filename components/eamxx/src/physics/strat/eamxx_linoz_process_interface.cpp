@@ -42,6 +42,7 @@ STRATLinoz::create_requests()
   nlev_ = grid_->get_num_vertical_levels(); // number of levels per column
   // Layout for 3D (2d horiz X 1d vertical) variable defined at mid-level and
   // interfaces
+  const FieldLayout scalar2d     = grid_->get_2d_scalar_layout();
   const FieldLayout scalar3d_mid = grid_->get_3d_scalar_layout(LEV);
   const FieldLayout scalar3d_int = grid_->get_3d_scalar_layout(ILEV);
   // Creating a Linoz reader and setting Linoz parameters involves reading data
@@ -71,6 +72,8 @@ STRATLinoz::create_requests()
   // If not using prescribed O3 (i.e., prognostic O3), we add it as a tracer
   add_tracer<Updated>("O3", grid_, q_unit);
   add_field<Required>("pseudo_density_dry", scalar3d_mid, Pa, grid_name);
+  // tropopause level index per column (for output/diagnostics)
+  add_field<Computed>("tropopause_index", scalar2d, none, grid_name);
 
 }
 
@@ -222,7 +225,8 @@ void STRATLinoz::run_impl(const double dt) {
   const auto& dz      = dz_;
   const auto& z_iface = z_iface_;
   const auto& z_mid   = z_mid_;
-  const auto& qv_dry = qv_dry_;
+  const auto& qv_dry  = qv_dry_;
+  const auto& ilev_tropp = get_field_out("tropopause_index").get_view<Real *>();
 
   const int ncol = ncol_;
   const int nlev = nlev_;
@@ -423,11 +427,12 @@ Kokkos::parallel_for(
 
       //Find tropopause (or quit simulation if not found) as extinction should be
       // applied only above tropopause */
-      const int ilev_tropp = mam4::aero_rad_props::tropopause_or_quit(p_mid_icol, pint_icol, T_mid_icol, z_mid_icol, z_i_face_icol);
+      const int index_tropp = mam4::aero_rad_props::tropopause_or_quit(p_mid_icol, pint_icol, T_mid_icol, z_mid_icol, z_i_face_icol);
+      ilev_tropp(icol) = Real(index_tropp);
       // Part 1: LINOZ chemistry
       team.team_barrier();
       Kokkos::parallel_for(
-       Kokkos::TeamVectorRange(team, ilev_tropp),
+       Kokkos::TeamVectorRange(team, index_tropp),
         [&](const int kk) {
         const Real temp = T_mid_icol(kk);
         const Real pmid = p_mid_icol(kk);
