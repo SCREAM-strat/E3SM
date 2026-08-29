@@ -18,7 +18,7 @@ class STRATLinoz : public AtmosphereProcess {
   using view_2d       = typename KT::template view_2d<Real>;
   using const_view_1d = typename KT::template view_1d<const Real>;
 
-  using view_1d_host = typename KT::view_1d<Real>::HostMirror;
+  using view_1d_host  = typename KT::view_1d<Real>::HostMirror;
 
   // a thread team dispatched to a single vertical column
   using ThreadTeam = mam4::ThreadTeam;
