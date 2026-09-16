@@ -990,6 +990,9 @@ contains
         divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
         vort(:,:,k)=vorticity_sphere(elem(ie)%state%v(:,:,:,k,n0),deriv,elem(ie))
 
+        ! Store vorticity in derived state for output
+        elem(ie)%derived%vort(:,:,k) = vort(:,:,k)
+
      enddo
 
      ! compute T_v for timelevel n0
@@ -1412,4 +1415,3 @@ contains
 
 
 end module prim_advance_mod
-

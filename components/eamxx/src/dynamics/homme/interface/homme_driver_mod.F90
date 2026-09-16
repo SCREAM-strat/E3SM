@@ -130,6 +130,7 @@ contains
     use element_state,     only: elem_state_v, elem_state_w_i, elem_state_vtheta_dp,   &
                                  elem_state_phinh_i, elem_state_dp3d, elem_state_ps_v, &
                                  elem_state_Qdp, elem_state_Q, elem_derived_omega_p,   &
+                                 elem_derived_vorticity,                                &
                                  elem_state_phis
 
     !
@@ -142,6 +143,7 @@ contains
     type (c_ptr) :: elem_state_v_ptr, elem_state_w_i_ptr, elem_state_vtheta_dp_ptr, elem_state_phinh_i_ptr
     type (c_ptr) :: elem_state_dp3d_ptr, elem_state_Qdp_ptr, elem_state_Q_ptr, elem_state_ps_v_ptr
     type (c_ptr) :: elem_derived_omega_p_ptr
+    type (c_ptr) :: elem_derived_vorticity_ptr
 
     integer :: ie
     type (c_ptr) :: elem_state_phis_local_ptr, elem_derived_gradphis_local_ptr
@@ -158,11 +160,13 @@ contains
     elem_state_Q_ptr         = c_loc(elem_state_Q)
     elem_state_ps_v_ptr      = c_loc(elem_state_ps_v)
     elem_derived_omega_p_ptr = c_loc(elem_derived_omega_p)
+    elem_derived_vorticity_ptr = c_loc(elem_derived_vorticity)
 
     ! Copy data
     call cxx_push_results_to_f90(elem_state_v_ptr, elem_state_w_i_ptr, elem_state_vtheta_dp_ptr,   &
                                  elem_state_phinh_i_ptr, elem_state_dp3d_ptr, elem_state_ps_v_ptr, &
-                                 elem_state_Qdp_ptr, elem_state_Q_ptr, elem_derived_omega_p_ptr)
+                                 elem_state_Qdp_ptr, elem_state_Q_ptr, elem_derived_omega_p_ptr,   &
+                                 elem_derived_vorticity_ptr)
     if (copy_phis) then
       ! Set phis=phi(bottom)
       elem_state_phis(:,:,:) = elem_state_phinh_i(:,:,nlevp,tl%n0,:)

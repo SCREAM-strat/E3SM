@@ -470,6 +470,7 @@ contains
     use element_state,  only : elem_state_v, elem_state_w_i, elem_state_vtheta_dp,     &
                                elem_state_phinh_i, elem_state_dp3d, elem_state_ps_v,   &
                                elem_state_Qdp, elem_state_Q, elem_derived_omega_p,     &
+                               elem_derived_vorticity,                                 &
                                elem_derived_FM, elem_derived_FVTheta, elem_derived_FT, &
                                elem_derived_FPHI, elem_derived_FQ
     use hybrid_mod,     only : hybrid_t
@@ -505,6 +506,7 @@ contains
     type (c_ptr) :: elem_state_v_ptr, elem_state_w_i_ptr, elem_state_vtheta_dp_ptr, elem_state_phinh_i_ptr
     type (c_ptr) :: elem_state_dp3d_ptr, elem_state_Qdp_ptr, elem_state_Q_ptr, elem_state_ps_v_ptr
     type (c_ptr) :: elem_derived_omega_p_ptr
+    type (c_ptr) :: elem_derived_vorticity_ptr
     integer :: n0_qdp, np1_qdp
     real(kind=real_kind) :: dt_remap, dt_q
     logical :: compute_forcing_and_push_to_c, push_to_f
@@ -575,6 +577,7 @@ contains
       elem_state_Q_ptr         = c_loc(elem_state_Q)
       elem_state_ps_v_ptr      = c_loc(elem_state_ps_v)
       elem_derived_omega_p_ptr = c_loc(elem_derived_omega_p)
+      elem_derived_vorticity_ptr = c_loc(elem_derived_vorticity)
 
 #if defined(CAM) && !defined(SCREAM)
       ! CAM reads only n0 / n0_qdp after a step, so copy back just those levels.
@@ -590,12 +593,13 @@ contains
       call cxx_push_results_to_f90_tl(elem_state_v_ptr, elem_state_w_i_ptr, elem_state_vtheta_dp_ptr,   &
                                       elem_state_phinh_i_ptr, elem_state_dp3d_ptr, elem_state_ps_v_ptr, &
                                       elem_state_Qdp_ptr, elem_state_Q_ptr, elem_derived_omega_p_ptr,   &
-                                      tl%n0, n0_qdp)
+                                      elem_derived_vorticity_ptr, tl%n0, n0_qdp)
 #else
       ! EAMxx may use current and previous timelevels for statefreq diagnostics, so keep the all-time-levels copy
-      call cxx_push_results_to_f90(elem_state_v_ptr, elem_state_w_i_ptr, elem_state_vtheta_dp_ptr,   &
-                                   elem_state_phinh_i_ptr, elem_state_dp3d_ptr, elem_state_ps_v_ptr, &
-                                   elem_state_Qdp_ptr, elem_state_Q_ptr, elem_derived_omega_p_ptr)
+       call cxx_push_results_to_f90(elem_state_v_ptr, elem_state_w_i_ptr, elem_state_vtheta_dp_ptr,   &
+                                    elem_state_phinh_i_ptr, elem_state_dp3d_ptr, elem_state_ps_v_ptr, &
+                                    elem_state_Qdp_ptr, elem_state_Q_ptr, elem_derived_omega_p_ptr,   &
+                                    elem_derived_vorticity_ptr)
 #endif
       call t_stopf('push_to_f90')
     endif

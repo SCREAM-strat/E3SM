@@ -200,7 +200,8 @@ void init_hvcoord_c (const Real& ps0, CRCPtr& hybrid_am_ptr, CRCPtr& hybrid_ai_p
 // memcpy and so is not worth a trimmed variant.
 static void push_results_to_f90_tl_free (F90Ptr &elem_state_ps_v_ptr,
                                          F90Ptr &elem_Q_ptr,
-                                         F90Ptr &elem_derived_omega_p_ptr) {
+                                         F90Ptr &elem_derived_omega_p_ptr,
+                                         F90Ptr &elem_derived_vorticity_ptr) {
   auto &c = Context::singleton();
   ElementsState &state = c.get<ElementsState>();
   Tracers &tracers = c.get<Tracers>();
@@ -221,6 +222,9 @@ static void push_results_to_f90_tl_free (F90Ptr &elem_state_ps_v_ptr,
   sync_to_host(derived.m_omega_p,
                HostViewUnmanaged<Real * [NUM_PHYSICAL_LEV][NP][NP]>(
                    elem_derived_omega_p_ptr, num_elems));
+  sync_to_host(derived.m_vorticity,
+               HostViewUnmanaged<Real * [NUM_PHYSICAL_LEV][NP][NP]>(
+                   elem_derived_vorticity_ptr, num_elems));
   sync_to_host(tracers.Q,
                HostViewUnmanaged<Real * [QSIZE_D][NUM_PHYSICAL_LEV][NP][NP]>(
                    elem_Q_ptr, num_elems));
@@ -232,7 +236,7 @@ void cxx_push_results_to_f90(F90Ptr &elem_state_v_ptr,         F90Ptr &elem_stat
                              F90Ptr &elem_state_vtheta_dp_ptr, F90Ptr &elem_state_phinh_i_ptr,
                              F90Ptr &elem_state_dp3d_ptr,      F90Ptr &elem_state_ps_v_ptr,
                              F90Ptr &elem_state_Qdp_ptr,       F90Ptr &elem_Q_ptr,
-                             F90Ptr &elem_derived_omega_p_ptr) {
+                             F90Ptr &elem_derived_omega_p_ptr, F90Ptr &elem_derived_vorticity_ptr) {
   auto &c = Context::singleton();
 
   c.get<ElementsState>().push_to_f90_pointers(
@@ -240,7 +244,8 @@ void cxx_push_results_to_f90(F90Ptr &elem_state_v_ptr,         F90Ptr &elem_stat
       elem_state_phinh_i_ptr, elem_state_dp3d_ptr);
   c.get<Tracers>().push_qdp(elem_state_Qdp_ptr);
 
-  push_results_to_f90_tl_free(elem_state_ps_v_ptr, elem_Q_ptr, elem_derived_omega_p_ptr);
+  push_results_to_f90_tl_free(elem_state_ps_v_ptr, elem_Q_ptr, elem_derived_omega_p_ptr,
+                              elem_derived_vorticity_ptr);
 }
 
 // Copy back only the time levels the f90 side will actually read. Used on the
@@ -250,6 +255,7 @@ void cxx_push_results_to_f90_tl(F90Ptr &elem_state_v_ptr,         F90Ptr &elem_s
                                 F90Ptr &elem_state_dp3d_ptr,      F90Ptr &elem_state_ps_v_ptr,
                                 F90Ptr &elem_state_Qdp_ptr,       F90Ptr &elem_Q_ptr,
                                 F90Ptr &elem_derived_omega_p_ptr,
+                                F90Ptr &elem_derived_vorticity_ptr,
                                 const int &n0_f, const int &n0_qdp_f) {
   auto &c = Context::singleton();
 
@@ -286,7 +292,8 @@ void cxx_push_results_to_f90_tl(F90Ptr &elem_state_v_ptr,         F90Ptr &elem_s
 
   c.get<Tracers>().push_qdp(elem_state_Qdp_ptr, tl.np1_qdp, qdp_dst);
 
-  push_results_to_f90_tl_free(elem_state_ps_v_ptr, elem_Q_ptr, elem_derived_omega_p_ptr);
+  push_results_to_f90_tl_free(elem_state_ps_v_ptr, elem_Q_ptr, elem_derived_omega_p_ptr,
+                             elem_derived_vorticity_ptr);
 }
 
 //currently, we do not need FVTheta and FPHI, because they are computed from FT and FQ

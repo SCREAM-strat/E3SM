@@ -43,6 +43,7 @@ module element_state
   real (kind=real_kind), allocatable, target, public :: elem_state_Qdp  (:,:,:,:,:,:)           ! Tracer mass                        
 
   real (kind=real_kind), allocatable, target, public :: elem_derived_omega_p (:,:,:,:)          ! vertical tendency (derived)
+  real (kind=real_kind), allocatable, target, public :: elem_derived_vorticity (:,:,:,:)        ! relative vorticity (derived)
   real (kind=real_kind), allocatable, target, public :: elem_derived_eta_dot_dpdn (:,:,:,:)     ! used with prescribed_wind
   real (kind=real_kind), allocatable, target, public :: elem_derived_vn0 (:,:,:,:,:)            ! used with prescribed_wind
 
@@ -101,6 +102,7 @@ module element_state
 
     ! diagnostics
     real (kind=real_kind), pointer :: omega_p(:,:,:)                  ! vertical tendency (derived)
+    real (kind=real_kind), pointer :: vort(:,:,:)                     ! relative vorticity (derived)
     real (kind=real_kind), pointer :: eta_dot_dpdn(:,:,:)             ! mean vertical flux from dynamics
     real (kind=real_kind) :: eta_dot_dpdn_prescribed(np,np,nlevp)     ! prescribed wind test cases
 
@@ -195,6 +197,7 @@ contains
 
     ! Derived
     allocate(elem_derived_omega_p (np,np,nlev,nelemd)       )
+    allocate(elem_derived_vorticity (np,np,nlev,nelemd)     )
     allocate(elem_derived_vn0     (np,np,2,nlev,nelemd)     )
     allocate(elem_derived_eta_dot_dpdn (np,np,nlevp,nelemd) )
 
@@ -248,6 +251,7 @@ contains
 
     ! Derived
     deallocate(elem_derived_omega_p )
+    deallocate(elem_derived_vorticity )
     deallocate(elem_derived_vn0     )
     deallocate(elem_derived_eta_dot_dpdn )
 
@@ -296,6 +300,7 @@ contains
 
     ! Derived
     derived%omega_p => elem_derived_omega_p(:,:,:,ie)
+    derived%vort => elem_derived_vorticity(:,:,:,ie)
     derived%vn0 => elem_derived_vn0(:,:,:,:,ie)
     derived%eta_dot_dpdn => elem_derived_eta_dot_dpdn(:,:,:,ie)
 
