@@ -176,6 +176,7 @@ void HommeDynamics::create_requests ()
   add_field<Computed>("p_dry_int",          pg_scalar3d_int, Pa,    pgn,N);
   add_field<Computed>("p_dry_mid",          pg_scalar3d_mid, Pa,    pgn,N);
   add_field<Computed>("omega",              pg_scalar3d_mid, Pa/s,  pgn,N);
+  add_field<Computed>("vorticity",          pg_scalar3d_mid, 1/s,   pgn,N);
   if (params.do_3d_turbulence) {
     add_field<Required>("eddy_diff_heat_horiz", pg_scalar3d_mid, m2/s,  pgn,N);
     add_field<Required>("eddy_diff_mom_horiz",  pg_scalar3d_mid, m2/s,  pgn,N);
@@ -215,6 +216,7 @@ void HommeDynamics::create_requests ()
   create_helper_field("ps_dyn",       {EL,TL,    GP,GP},     {nelem,NTL,  NP,NP         }, dgn);
   create_helper_field("phis_dyn",     {EL,       GP,GP},     {nelem,      NP,NP         }, dgn);
   create_helper_field("omega_dyn",    {EL,       GP,GP,LEV}, {nelem,      NP,NP,nlev_mid}, dgn);
+  create_helper_field("vort_dyn",     {EL,       GP,GP,LEV}, {nelem,      NP,NP,nlev_mid}, dgn);
   create_helper_field("Qdp_dyn",      {EL,TL,CMP,GP,GP,LEV}, {nelem,QTL,HOMMEXX_QSIZE_D,NP,NP,nlev_mid},dgn);
   if (params.do_3d_turbulence) {
     create_helper_field("Km_dyn",       {EL,       GP,GP,LEV}, {nelem,      NP,NP,nlev_mid}, dgn);
@@ -252,6 +254,7 @@ void HommeDynamics::create_requests ()
   // The output manager pulls from the atm process fields. Add
   // helper fields for the case that a user request output.
   add_internal_field (m_helper_fields.at("omega_dyn"));
+  add_internal_field (m_helper_fields.at("vort_dyn"));
   add_internal_field (m_helper_fields.at("phis_dyn"),{"RESTART"});
 
   if (not fv_phys_active()) {
@@ -470,6 +473,7 @@ void HommeDynamics::initialize_impl (const RunType run_type)
     m_d2p_remapper->register_field(get_internal_field("ps_dyn"), get_field_out("ps"));
     m_d2p_remapper->register_field(m_helper_fields.at("Q_dyn"),get_group_out("Q",pgn).monolithic_field());
     m_d2p_remapper->register_field(m_helper_fields.at("omega_dyn"), get_field_out("omega"));
+    m_d2p_remapper->register_field(m_helper_fields.at("vort_dyn"), get_field_out("vorticity"));
 
     if (params.do_3d_turbulence) {
       // Remap SHOC eddy diffusivities from physics grid to dynamics grid.
@@ -975,6 +979,11 @@ void HommeDynamics::init_homme_views () {
   using omega_type = std::remove_reference<decltype(derived.m_omega_p)>::type;
   derived.m_omega_p = omega_type(omega_in.data(),nelem);
 
+  // Vorticity
+  auto vort_in = m_helper_fields.at("vort_dyn").template get_view<Homme::Scalar*[NP][NP][NVL]>();
+  using vort_type = std::remove_reference<decltype(derived.m_vorticity)>::type;
+  derived.m_vorticity = vort_type(vort_in.data(),nelem);
+
   // Tracers mixing ratio
   auto q_in = m_helper_fields.at("Q_dyn").template get_view<Homme::Scalar**[NP][NP][NVL]>();
   using q_type = std::remove_reference<decltype(tracers.Q)>::type;
@@ -1325,6 +1334,7 @@ void HommeDynamics::initialize_homme_state () {
   // not have valid computed values for this initial
   // output. Set to zero avoid potential FPE.
   get_internal_field("omega_dyn").deep_copy(0);
+  get_internal_field("vort_dyn").deep_copy(0);
 
   // Copy IC states on all timelevel slices
   copy_dyn_states_to_all_timelevels ();

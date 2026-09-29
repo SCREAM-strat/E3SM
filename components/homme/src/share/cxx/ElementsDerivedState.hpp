@@ -16,6 +16,7 @@ class ElementsDerivedState {
 public:
 
   ExecViewManaged<Scalar * [NP][NP][NUM_LEV]>     m_omega_p;  // Scaled 'pressure vertical velocity' (omega=(1/p)*Dp/Dt)
+  ExecViewManaged<Scalar * [NP][NP][NUM_LEV]>     m_vorticity; // Relative vorticity (1/s)
   ExecViewManaged<Scalar * [2][NP][NP][NUM_LEV]>  m_vn0;      // weighted velocity flux for consistency
   ExecViewManaged<Scalar * [2][NP][NP][NUM_LEV]>  m_vstar;    // velocity at start of tracer time step
 

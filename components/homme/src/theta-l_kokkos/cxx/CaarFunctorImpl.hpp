@@ -1118,6 +1118,17 @@ struct CaarFunctorImpl {
     // Compute vorticity(v)
     m_sphere_ops.vorticity_sphere(kv, Homme::subview(m_state.m_v,kv.ie,m_data.n0),
                                       vort);
+ 
+    // Store vorticity in derived state for output
+    Kokkos::parallel_for(Kokkos::TeamThreadRange(kv.team,NP*NP*NUM_LEV),
+                     [&](const int idx) {
+      const int k = idx / (NP*NP);
+      const int ij = idx % (NP*NP);
+      const int igp = ij / NP;
+      const int jgp = ij % NP;
+      m_derived.m_vorticity(kv.ie,igp,jgp,k) = vort(igp,jgp,k);
+    });
+    kv.team_barrier();
 
     if (m_theta_hydrostatic_mode) {
       // In nh mode, gradphinh has already been computed, but in hydro mode

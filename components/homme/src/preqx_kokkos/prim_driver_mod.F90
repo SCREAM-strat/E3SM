@@ -213,7 +213,8 @@ contains
     use dimensions_mod, only : nelemd
     use element_mod,    only : element_t
     use element_state,  only : elem_state_v, elem_state_temp, elem_state_dp3d, &
-                               elem_state_Qdp, elem_state_Q, elem_state_ps_v, elem_derived_omega_p
+                               elem_state_Qdp, elem_state_Q, elem_state_ps_v, elem_derived_omega_p, &
+                               elem_derived_vorticity
     use hybrid_mod,     only : hybrid_t
     use hybvcoord_mod,  only : hvcoord_t
     use kinds,          only : real_kind
@@ -236,7 +237,7 @@ contains
 
       subroutine cxx_push_results_to_f90(elem_state_v_ptr, elem_state_temp_ptr, elem_state_dp3d_ptr, &
                                          elem_state_Qdp_ptr, elem_state_Q_ptr, elem_state_ps_v_ptr,  &
-                                         elem_derived_omega_p_ptr) bind(c)
+                                         elem_derived_omega_p_ptr, elem_derived_vorticity_ptr) bind(c)
         use iso_c_binding , only : c_ptr
         !
         ! Inputs
@@ -244,6 +245,7 @@ contains
         type (c_ptr),          intent(in) :: elem_state_v_ptr, elem_state_temp_ptr, elem_state_dp3d_ptr
         type (c_ptr),          intent(in) :: elem_state_Qdp_ptr, elem_state_Q_ptr, elem_state_ps_v_ptr
         type (c_ptr),          intent(in) :: elem_derived_omega_p_ptr
+        type (c_ptr),          intent(in) :: elem_derived_vorticity_ptr
       end subroutine cxx_push_results_to_f90
     end interface
     !
@@ -266,6 +268,7 @@ contains
     type (c_ptr) :: elem_state_v_ptr, elem_state_temp_ptr, elem_state_dp3d_ptr
     type (c_ptr) :: elem_state_Qdp_ptr, elem_state_Q_ptr, elem_state_ps_v_ptr
     type (c_ptr) :: elem_derived_omega_p_ptr
+    type (c_ptr) :: elem_derived_vorticity_ptr
 
     if (nets/=1 .or. nete/=nelemd) then
       call abortmp ('We don''t allow to call C routines from a horizontally threaded region')
@@ -297,12 +300,13 @@ contains
       elem_state_Q_ptr         = c_loc(elem_state_Q)
       elem_state_ps_v_ptr      = c_loc(elem_state_ps_v)
       elem_derived_omega_p_ptr = c_loc(elem_derived_omega_p)
+      elem_derived_vorticity_ptr = c_loc(elem_derived_vorticity)
 
       ! Copy cxx arrays back to f90 structures
       call t_startf('push_to_f90')
       call cxx_push_results_to_f90(elem_state_v_ptr, elem_state_temp_ptr, elem_state_dp3d_ptr, &
                                    elem_state_Qdp_ptr, elem_state_Q_ptr, elem_state_ps_v_ptr, &
-                                   elem_derived_omega_p_ptr)
+                                   elem_derived_omega_p_ptr, elem_derived_vorticity_ptr)
       call t_stopf('push_to_f90')
     endif
 

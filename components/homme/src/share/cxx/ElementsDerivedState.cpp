@@ -23,6 +23,7 @@ void ElementsDerivedState::init(const int num_elems) {
   m_num_elems = num_elems;
 
   m_omega_p = ExecViewManaged<Scalar * [NP][NP][NUM_LEV]>("Omega P", m_num_elems);
+  m_vorticity = ExecViewManaged<Scalar * [NP][NP][NUM_LEV]>("Vorticity", m_num_elems);
 
   m_vn0 = ExecViewManaged<Scalar * [2][NP][NP][NUM_LEV]>("Derived Lateral Velocities", m_num_elems);
   m_vstar = ExecViewManaged<Scalar * [2][NP][NP][NUM_LEV]>("v at tracer time step start", m_num_elems);

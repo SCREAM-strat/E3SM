@@ -139,7 +139,7 @@ void init_hvcoord_c (const Real& ps0, CRCPtr& hybrid_am_ptr, CRCPtr& hybrid_ai_p
 void cxx_push_results_to_f90(F90Ptr &elem_state_v_ptr, F90Ptr &elem_state_temp_ptr,
                              F90Ptr &elem_state_dp3d_ptr, F90Ptr &elem_state_Qdp_ptr,
                              F90Ptr &elem_Q_ptr, F90Ptr &elem_state_ps_v_ptr,
-                             F90Ptr &elem_derived_omega_p_ptr) {
+                             F90Ptr &elem_derived_omega_p_ptr, F90Ptr &elem_derived_vorticity_ptr) {
   Elements &elements = Context::singleton().get<Elements>();
   elements.m_state.push_to_f90_pointers(elem_state_v_ptr, elem_state_temp_ptr, elem_state_dp3d_ptr);
 
