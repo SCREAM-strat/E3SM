@@ -9,7 +9,7 @@ namespace scream {
 class DataInterpolation;
 // The process responsible for handling MAM4 aerosol microphysics. The AD
 // stores exactly ONE instance of this class in its list of subcomponents.
-class STRATLinoz : public AtmosphereProcess {
+class STRATLinoz : public scream::AtmosphereProcess {
   using KT = ekat::KokkosTypes<DefaultDevice>;
 
 
@@ -18,8 +18,7 @@ class STRATLinoz : public AtmosphereProcess {
   using view_2d       = typename KT::template view_2d<Real>;
   using const_view_1d = typename KT::template view_1d<const Real>;
 
-  using view_1d_host  = typename KT::view_1d<Real>::HostMirror;
-
+  using view_1d_host = typename KT::view_1d<Real>::host_mirror_type;
   // a thread team dispatched to a single vertical column
   using ThreadTeam = mam4::ThreadTeam;
 
