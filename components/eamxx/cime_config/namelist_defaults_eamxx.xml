@@ -364,6 +364,8 @@ be lost if SCREAM_HACK_XML is not enabled.
       <wsubmin type="real" doc="Minimum diagnostic sub-grid vertical velocity">0.001</wsubmin>
       <enable_aero_vertical_mix type="logical" doc="Enable vertical mixing of interstitial aerosols and liquid number during activation">true</enable_aero_vertical_mix>
       <top_level_mam4xx type="integer" doc="Level corresponding to the top of troposphere clouds" vgrid="L72" >6</top_level_mam4xx>
+      <top_level_mam4xx type="integer" doc="Level corresponding to the top of troposphere clouds" vgrid="L80" >6</top_level_mam4xx>
+      <top_level_mam4xx type="integer" doc="Level corresponding to the top of troposphere clouds" vgrid="L192" >6</top_level_mam4xx>
       <top_level_mam4xx type="integer" doc="level corresponding to the top of troposphere clouds" vgrid="L128">0</top_level_mam4xx>
     </mam4_aci>
 
@@ -553,6 +555,10 @@ be lost if SCREAM_HACK_XML is not enabled.
       <my_param vgrid="L128" action="append">3,4</my_param>
       <my_param vgrid="L72"  action="append">3,4</my_param>
       <my_param vgrid="L72"  action="remove">3</my_param>
+      <my_param vgrid="L80"  action="append">3,4</my_param>
+      <my_param vgrid="L80"  action="remove">3</my_param>
+      <my_param vgrid="L192"  action="append">3,4</my_param>
+      <my_param vgrid="L192"  action="remove">3</my_param>
       <!-- Open nodes: atmchange can add/remove leaves to/from them. All leaves must be arrays of reals -->
       <open_params open="true" leaf_type="array(real)" leaf_doc="Test leaf of an open node">
         <p1>1.0</p1>
@@ -742,11 +748,20 @@ be lost if SCREAM_HACK_XML is not enabled.
     <vertical_coordinate_filename vgrid="L72">${DIN_LOC_ROOT}/atm/scream/init/vertical_coordinates_L72_20220927.nc</vertical_coordinate_filename>
     <vertical_coordinate_filename vgrid="L128v1">${DIN_LOC_ROOT}/atm/scream/init/vertical_coordinates_L128_20220927.nc</vertical_coordinate_filename>
     <vertical_coordinate_filename vgrid="L128v4">${DIN_LOC_ROOT}/atm/scream/init/vertical_coordinates_L128v4_c20260820.nc</vertical_coordinate_filename>
+    <vertical_coordinate_filename vgrid="L80">dummy</vertical_coordinate_filename>
+    <vertical_coordinate_filename vgrid="L192">dummy</vertical_coordinate_filename>
   </grids_manager>
 
   <!-- List of nc files for loading inputs on specified grids -->
   <initial_conditions>
     <filename type="file">UNSET</filename>
+    <filename hgrid="ne30np4"   vgrid="L80" >dummy</filename>
+    <filename hgrid="ne64np4"   vgrid="L80" >dummy</filename>
+    <filename hgrid="ne256np4"   vgrid="L80" >dummy</filename>
+    <filename hgrid="ne30np4"   vgrid="L192" >dummy</filename>
+    <filename hgrid="ne64np4"   vgrid="L192" >dummy</filename>
+    <filename hgrid="ne256np4"   vgrid="L192" >dummy</filename>
+
     <!-- L72 for testing -->
     <filename hgrid="ne4np4"   vgrid="L72">${DIN_LOC_ROOT}/atm/scream/init/screami_ne4np4L72_20260813.nc</filename>
     <filename hgrid="ne30np4"  vgrid="L72">${DIN_LOC_ROOT}/atm/scream/init/screami_ne30np4L72_20260813.nc</filename>
@@ -996,6 +1011,8 @@ be lost if SCREAM_HACK_XML is not enabled.
     <hypervis_scaling>3.0</hypervis_scaling>
     <laplace_scaling>UNSET</laplace_scaling>
     <laplace_scaling vgrid="L72"   >0.0</laplace_scaling>
+    <laplace_scaling vgrid="L80"   >0.0</laplace_scaling>
+    <laplace_scaling vgrid="L192"   >0.0</laplace_scaling>
     <laplace_scaling vgrid="L128v1">0.0</laplace_scaling>
     <laplace_scaling vgrid="L128v4">1.0</laplace_scaling>
     <!-- DP is less stable when using laplace_scaling=1, so keep the old sponge layer settings -->
@@ -1026,6 +1043,8 @@ be lost if SCREAM_HACK_XML is not enabled.
     <nu_top vgrid="L128v4" COMPSET=".*DP-EAMxx">1.0e4</nu_top>
     <tom_sponge_start type="real" doc="sponge layer bot pressure [hPa]">UNSET</tom_sponge_start>
     <tom_sponge_start type="real" vgrid="L72"    >0.0</tom_sponge_start>
+    <tom_sponge_start type="real" vgrid="L80"    >0.0</tom_sponge_start>
+    <tom_sponge_start type="real" vgrid="L192"    >0.0</tom_sponge_start>
     <tom_sponge_start type="real" vgrid="L128v1" >0.0</tom_sponge_start>
     <tom_sponge_start type="real" vgrid="L128v4" >15.0</tom_sponge_start>
     <pgrad_correction>1</pgrad_correction>                <!-- Default (rough topography) -->
